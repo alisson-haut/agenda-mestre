@@ -52,9 +52,9 @@ npm run build        # dist/ (front) + dist-server/ (API bundle)
 | Vai mexer em... | Leia |
 |---|---|
 | Visão geral, pastas, schema, decisões e porquês | `docs/arquitetura.md` |
-| UI/React: store, modais, drag&drop, alertas, CSS, checklist de campo novo | `docs/frontend.md` |
-| API, auth, validação, banco/adapter, env | `docs/backend.md` |
+| UI/React: store, modais (nota/contatos/cofre), drag&drop, alertas, CSS, checklist de campo novo | `docs/frontend.md` |
+| API, auth, notas/contatos/arquivos (MinIO), cofre Secrets, validação, banco/adapter, env | `docs/backend.md` |
 | Motor de e-mail/WhatsApp, fila, rate limits, enqueue p/ novas features | `docs/mensageria.md` |
-| Groq (ditado), Evolution GO (pegadinhas!), Resend, DNS | `docs/integracoes.md` |
+| Groq (ditado), Evolution GO (pegadinhas!), Resend, MinIO (pegadinhas!), DNS | `docs/integracoes.md` |
 | Testes: rodar, padrões, mocks, flakiness | `docs/testes.md` |
 | Deploy EasyPanel/Cloudflare, envs de produção | `DEPLOY.md` |

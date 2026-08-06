@@ -91,9 +91,11 @@ Guia completo em [DEPLOY.md](DEPLOY.md) — EasyPanel via [`easypanel.json`](eas
 ## Estrutura
 
 ```
-client/          React (views do calendário, folha de tarefas, modais, auth)
-server/          Express (auth, estado, adaptador pg/PGlite)
-e2e/             Testes Playwright
+client/          React (calendário, notas, contatos, cofre, modais, auth)
+server/          Express (auth, estado, notas/contatos/secrets, mensageria)
+server/files/    Storage de mídia (MinIO/S3 ou disco) atrás de proxy autenticado
+e2e/             Testes Playwright (6 specs × desktop e mobile)
 Dockerfile       Build multi-stage (imagem final só com deps de produção)
 easypanel.json   Schema de instalação no EasyPanel
+docker-compose.yml  App + Postgres + MinIO com um comando
 ```
