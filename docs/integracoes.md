@@ -54,3 +54,22 @@ opcionalmente `_dmarc`.
 
 Template HTML em `server/notify/templates.ts` — tabela inline-styled no visual
 papel-e-tinta (#F3F3EF/#0F6B57), notas escapadas, botão para `APP_URL`.
+
+## MinIO — mídia das notas (`server/files/storage-minio.ts`)
+
+Pacote `minio` (^8) com envs `MINIO_SERVER_URL` (URL completa — o adapter
+extrai host/porta/SSL), `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` e
+`MINIO_BUCKET` (padrão `agendamestre-files`, criado no boot com retry ~5x).
+O navegador NUNCA fala com o MinIO — proxy autenticado em `/api/files`.
+
+**Pegadinhas (aprendidas testando — não "corrigir" sem testar):**
+- `putObject(bucket, key, stream, size, {'Content-Type'})` streama de verdade
+  (SEMPRE passar o size — vem do Content-Length); >64MiB vira multipart com
+  pico ~64MiB de RAM por upload.
+- `setBucketLifecycle` do minio-js **descarta** regras
+  `AbortIncompleteMultipartUpload` na serialização XML (regra só com ela →
+  "malformed XML"). Não usamos lifecycle: o próprio MinIO expira multipart
+  obsoleto (`stale_uploads_expiry`, padrão 24h).
+- `getPartialObject(bucket, key, offset, length)` p/ Range/206 (vídeo).
+- Erros de "não existe": código `NoSuchKey`/`NotFound` (tratados como ok no
+  delete idempotente).

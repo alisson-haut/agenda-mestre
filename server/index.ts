@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { authRouter } from './auth.js';
 import { googleRouter } from './google-auth.js';
 import { stateRouter } from './state.js';
+import { contactsRouter } from './contacts.js';
+import { notesRouter, startOrphanSweep } from './notes.js';
+import { secretsRouter } from './secrets.js';
+import { filesRouter } from './files/routes.js';
+import { initStorage } from './files/storage.js';
 import { transcribeRouter } from './transcribe.js';
 import { notifyRouter } from './notify/routes.js';
 import { startNotifyWorker } from './notify/worker.js';
@@ -20,8 +25,8 @@ app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'same-origin');
   res.setHeader('X-Frame-Options', 'DENY');
-  /* o ditado usa microfone; câmera/geolocalização nunca */
-  res.setHeader('Permissions-Policy', 'camera=(), geolocation=(), microphone=(self)');
+  /* microfone: ditado/gravação; câmera: fotos e vídeos das notas */
+  res.setHeader('Permissions-Policy', 'camera=(self), geolocation=(), microphone=(self)');
   if (PROD) {
     /* HSTS/CSP só em produção: em dev o Vite serve o front (HMR usa inline
        scripts/websocket) e o HTML nem passa por este servidor */
@@ -34,6 +39,7 @@ app.use((_req, res, next) => {
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: blob:",
+        "media-src 'self' data: blob:" /* previews locais + mídia via /api/files */,
         "connect-src 'self'",
         "frame-ancestors 'none'",
         "base-uri 'self'",
@@ -48,6 +54,10 @@ app.use((_req, res, next) => {
 app.use('/api/auth', authRouter);
 app.use('/api/auth', googleRouter);
 app.use('/api/state', stateRouter);
+app.use('/api/contacts', contactsRouter);
+app.use('/api/notes', notesRouter);
+app.use('/api/secrets', secretsRouter);
+app.use('/api/files', filesRouter);
 app.use('/api/transcribe', transcribeRouter);
 app.use('/api/notify', notifyRouter);
 app.get('/api/health', async (_req, res) => {
@@ -80,6 +90,8 @@ getDB()
   .then(() => {
     app.listen(port, () => console.log(`AgendaMestre ${PROD ? '(produção)' : '(api dev)'} na porta ${port}`));
     if (!process.env.NOTIFY_DISABLED) startNotifyWorker();
+    void initStorage(); /* bucket/pasta com retry — não bloqueia o boot */
+    startOrphanSweep();
   })
   .catch((e) => {
     console.error('Falha ao iniciar o banco:', e);

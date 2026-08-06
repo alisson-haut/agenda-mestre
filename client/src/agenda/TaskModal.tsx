@@ -22,7 +22,8 @@ interface Props {
   open: boolean;
   session: number;
   editing: Task | null;
-  pre: { date?: string | null; time?: string | null };
+  /** pré-preenchimento de nova tarefa (ex.: "Gerar tarefa" de uma nota) */
+  pre: { date?: string | null; time?: string | null; title?: string; notes?: string };
   cats: Cat[];
   injectCat: string | null;
   narrow: boolean;
@@ -79,7 +80,7 @@ export function TaskModal(p: Props) {
       setSubs(t.subs.map((s) => ({ ...s })));
       setNotes(t.notes || '');
     } else {
-      setTitle('');
+      setTitle(p.pre.title || '');
       setSelCats([]); /* sem etiqueta padrão — só se o usuário escolher */
       setDate(p.pre.date || '');
       setTime(p.pre.time || '');
@@ -89,7 +90,7 @@ export function TaskModal(p: Props) {
       setRec('none');
       setUntil('');
       setSubs([]);
-      setNotes('');
+      setNotes(p.pre.notes || '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.session]);

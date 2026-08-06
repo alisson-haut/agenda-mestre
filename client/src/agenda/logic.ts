@@ -1,4 +1,4 @@
-import type { Cat, Inst, Task } from './types';
+import type { Cat, Inst, Note, Task } from './types';
 import { addDays, dayDiff, daysInMonth, MES3, parseYMD, today, ymd } from './dates';
 
 /* Contexto de leitura: tudo que os cálculos precisam do estado global */
@@ -8,6 +8,8 @@ export interface Ctx {
   hidden: string[];
   query: string;
   showDone: boolean;
+  /** notas do usuário — marcadas no calendário no dia de criação */
+  notes: Note[];
 }
 
 /* Recorrência — o algoritmo vive em shared/recurrence.ts (compartilhado com o
@@ -58,6 +60,22 @@ export function byDay(ctx: Ctx, start: Date, end: Date): Record<string, Inst[]> 
   const map: Record<string, Inst[]> = {};
   for (const inst of instancesIn(ctx, start, end)) (map[inst.dk] = map[inst.dk] || []).push(inst);
   for (const k in map) map[k].sort(cmpInst);
+  return map;
+}
+
+/* notas agrupadas por dia (dia de criação) — a busca global também filtra */
+export function notesByDay(ctx: Ctx, start: Date, end: Date): Record<string, Note[]> {
+  const map: Record<string, Note[]> = {};
+  const a = ymd(start), b = ymd(end);
+  for (const n of ctx.notes) {
+    if (n.date < a || n.date > b) continue;
+    if (ctx.query) {
+      const hay = (n.title + ' ' + n.desc + ' ' + n.links.map((l) => l.url + ' ' + l.label).join(' ')).toLowerCase();
+      if (!hay.includes(ctx.query)) continue;
+    }
+    (map[n.date] = map[n.date] || []).push(n);
+  }
+  for (const k in map) map[k].sort((x, y) => x.created - y.created);
   return map;
 }
 

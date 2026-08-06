@@ -5,6 +5,16 @@ trimestre e ano; etiquetas coloridas, recorrência, subtarefas, arrastar-e-solta
 tema claro/escuro, busca e **ditado por voz** (transcrição via Groq Whisper).
 Interface em português, no estilo "papel e tinta".
 
+Além das tarefas, o menu de acesso rápido traz:
+- **Notas** com fotos pela câmera, gravação de áudio e vídeo, anexos, links e
+  vínculo com contatos — marcadas no calendário no dia de criação e capazes de
+  **gerar uma tarefa agendada**; as mídias vivem num **MinIO/S3** próprio
+  (proxy autenticado, separação por usuário, cotas).
+- **Contatos** com cadastro básico e **import CSV** (modelo baixável).
+- **Secrets** — cofre de logins e senhas **zero-knowledge**: criptografia
+  AES-256-GCM no navegador com senha-mestra própria (PBKDF2 600k), auto-trava
+  em 2 minutos; o servidor só guarda ciphertext.
+
 Menu de perfil no topo (avatar) com **Configurações** — edição de nome, início da
 semana e troca de senha — e **Sair**. O ditado por voz fica nos campos de nome e
 anotações da tarefa: gravação com contador e barras de pico, botão de parar e
@@ -25,6 +35,7 @@ variáveis (`RESEND_API_KEY`, `EVOLUTION_BASE_URL`, ...).
 | Front | React 18 + TypeScript + Vite |
 | API | Express + TypeScript (Node 22) |
 | Banco | PostgreSQL (produção) · PGlite embutido no dev — zero instalação |
+| Arquivos | MinIO/S3 (produção) · disco local no dev — proxy autenticado, nunca exposto |
 | Auth | Sessões httpOnly + bcrypt (simples e seguro) |
 | Testes | Playwright (desktop + mobile) |
 | Deploy | Docker · EasyPanel (VPS Hostinger) · DNS Cloudflare |

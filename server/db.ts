@@ -105,6 +105,70 @@ const SCHEMA: string[] = [
     user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     data JSONB NOT NULL DEFAULT '{}'
   )`,
+  /* contatos — CRUD próprio, fora do full-state sync */
+  `CREATE TABLE IF NOT EXISTS contacts (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    company TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    avatar TEXT,
+    created BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, id)
+  )`,
+  /* notas — registradas no dia de criação (date), vínculos frouxos com
+     tarefa (task_id) e contatos (contact_ids): sem FK de propósito */
+  `CREATE TABLE IF NOT EXISTS notes (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT NOT NULL,
+    title TEXT NOT NULL DEFAULT '',
+    descr TEXT NOT NULL DEFAULT '',
+    date TEXT NOT NULL,
+    links JSONB NOT NULL DEFAULT '[]',
+    contact_ids JSONB NOT NULL DEFAULT '[]',
+    task_id TEXT,
+    created BIGINT NOT NULL DEFAULT 0,
+    updated BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_notes_user_date ON notes(user_id, date)`,
+  /* mídias das notas — SEM FK para notes: o upload acontece antes do save
+     da nota (id gerado no cliente); órfãos são varridos por idade */
+  `CREATE TABLE IF NOT EXISTS note_files (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT NOT NULL,
+    note_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    ext TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    size BIGINT NOT NULL,
+    created BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_note_files_note ON note_files(user_id, note_id)`,
+  /* cofre Secrets — zero-knowledge: o servidor só guarda o verificador
+     bcrypt(authKey) e ciphertexts opacos (título/segmento ficam DENTRO
+     do ciphertext); salt/iterations são públicos por design */
+  `CREATE TABLE IF NOT EXISTS secrets_vault (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    auth_hash TEXT NOT NULL,
+    salt TEXT NOT NULL,
+    iterations INT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS secrets_items (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT NOT NULL,
+    ciphertext TEXT NOT NULL,
+    iv TEXT NOT NULL,
+    created BIGINT NOT NULL DEFAULT 0,
+    updated BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, id)
+  )`,
 ];
 
 let dbPromise: Promise<DB> | null = null;

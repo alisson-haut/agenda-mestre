@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { api, type ServerState, type User } from '../api';
-import type { AppData, Cat, Filter, Task, View } from './types';
+import { api, type NotePayload, type ServerState, type User } from '../api';
+import type { AppData, Cat, Contact, Filter, Note, Task, View } from './types';
 import { DEFAULT_PREFS, taskCats } from './types';
 import { addDays, dayDiff, DIA3, DIAS, hhmmOf, MES3, MESES, parseYMD, startOfDay, today, uid, ymd } from './dates';
 import { byDay, catOf, cmpInst, dateLabelShort, isDone, repDate, toggleDone, visible, weekStartOf, type Ctx } from './logic';
 import { PALETA, PRESETS, seed } from './seed';
 import { CatIcon, HOUR, MiniMonth, MonthView, Pill, TimeGrid } from './Views';
 import { TaskModal, type TaskPayload } from './TaskModal';
+import { NoteModal } from './NoteModal';
+import { ContactsModal } from './ContactsModal';
+import { SecretsModal } from './SecretsModal';
 import { CatModal } from './CatModal';
 import { ConfigModal } from './ConfigModal';
 import { AlertModal } from './AlertModal';
@@ -190,6 +193,20 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
   const viewportRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  /* ---------- notas e contatos (CRUD próprio, fora do full-state) ---------- */
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [contacts, setContacts] = useState<Contact[] | null>(null);
+  const [noteModal, setNoteModal] = useState({ open: false, session: 0, editing: null as Note | null });
+  const [contactsModal, setContactsModal] = useState({ open: false, session: 0 });
+  const [secretsModal, setSecretsModal] = useState({ open: false, session: 0 });
+  /* nota que está esperando a tarefa gerada (fluxo "Gerar tarefa") */
+  const pendingNoteTask = useRef<string | null>(null);
+  useEffect(() => {
+    /* boot em paralelo, não bloqueante — sem chips no calendário se falhar */
+    api.listNotes().then(setNotes).catch(() => {});
+    api.listContacts().then(setContacts).catch(() => {});
+  }, []);
+
   const view = data.prefs.view;
   const weekStart = data.prefs.weekStart;
   const theme = data.prefs.theme;
@@ -207,6 +224,7 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
     hidden: data.prefs.hidden,
     query: query.trim().toLowerCase(),
     showDone: data.prefs.showDone,
+    notes,
   };
 
   /* ---------- navegação ---------- */
@@ -415,11 +433,14 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
     setTaskModal((s) => ({ open: true, session: s.session + 1, editing: t, dk, pre: {} }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const openNew = useCallback((pre: { date?: string | null; time?: string | null } = {}) => {
-    toast.hide();
-    setTaskModal((s) => ({ open: true, session: s.session + 1, editing: null, dk: null, pre }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const openNew = useCallback(
+    (pre: { date?: string | null; time?: string | null; title?: string; notes?: string } = {}) => {
+      toast.hide();
+      setTaskModal((s) => ({ open: true, session: s.session + 1, editing: null, dk: null, pre }));
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [],
+  );
   const closeTask = () => setTaskModal((s) => ({ ...s, open: false }));
   const openCat = (c: Cat | null) => {
     toast.hide();
@@ -428,6 +449,7 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
   const closeCat = () => setCatModal((s) => ({ ...s, open: false }));
 
   const saveTask = (payload: TaskPayload, editing: Task | null) => {
+    let novaId: string | null = null;
     mutate((d) => {
       if (editing) {
         if (editing.date !== payload.date) editing.doneDates = [];
@@ -439,10 +461,31 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
         }
         Object.assign(editing, payload);
       } else {
-        d.tasks.push({ id: uid(), doneDates: [], done: false, created: Date.now(), ...payload });
+        const nt = { id: uid(), doneDates: [], done: false, created: Date.now(), ...payload };
+        d.tasks.push(nt);
+        novaId = nt.id;
       }
     });
     closeTask();
+    /* tarefa nascida de uma nota → grava o vínculo frouxo na nota */
+    const noteId = pendingNoteTask.current;
+    if (noteId && novaId) {
+      pendingNoteTask.current = null;
+      const n = notes.find((x) => x.id === noteId);
+      if (n) {
+        const atualizada = { ...n, taskId: novaId };
+        setNotes((arr) => arr.map((x) => (x.id === noteId ? atualizada : x)));
+        api
+          .updateNote(noteId, {
+            title: atualizada.title, desc: atualizada.desc, date: atualizada.date,
+            links: atualizada.links, contactIds: atualizada.contactIds, taskId: novaId,
+          })
+          .catch(() => {});
+      }
+      toast.show('Tarefa criada a partir da nota');
+      return;
+    }
+    pendingNoteTask.current = null;
     toast.show(editing ? 'Tarefa atualizada' : 'Tarefa criada');
   };
 
@@ -460,6 +503,70 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
         d.tasks.splice(i, 0, t);
       }),
     );
+  };
+
+  /* ---------- notas ---------- */
+  const openNoteNew = () => {
+    toast.hide();
+    setNoteModal((s) => ({ open: true, session: s.session + 1, editing: null }));
+  };
+  const openNote = (id: string) => {
+    const n = notes.find((x) => x.id === id);
+    if (!n) return;
+    toast.hide();
+    setNoteModal((s) => ({ open: true, session: s.session + 1, editing: n }));
+  };
+  const closeNote = () => setNoteModal((s) => ({ ...s, open: false }));
+
+  const saveNote = async (payload: NotePayload, editing: Note | null, gerarTarefa = false) => {
+    try {
+      const salva = editing
+        ? await api.updateNote(editing.id, {
+            title: payload.title, desc: payload.desc, date: payload.date,
+            links: payload.links, contactIds: payload.contactIds, taskId: payload.taskId,
+          })
+        : await api.createNote(payload);
+      setNotes((arr) => (editing ? arr.map((x) => (x.id === salva.id ? salva : x)) : [salva, ...arr]));
+      closeNote();
+      if (gerarTarefa) {
+        pendingNoteTask.current = salva.id;
+        const resumo = salva.desc ? salva.desc.split('\n')[0].slice(0, 200) : '';
+        openNew({
+          date: salva.date,
+          title: salva.title || 'Tarefa da nota',
+          notes: resumo ? `Da nota: ${resumo}` : '',
+        });
+      } else {
+        toast.show(editing ? 'Nota atualizada' : 'Nota criada');
+      }
+    } catch (e: any) {
+      if (e?.status === 401) { location.reload(); return; }
+      toast.show(e?.message || 'Não consegui salvar a nota');
+    }
+  };
+
+  const deleteNote = async () => {
+    const n = noteModal.editing;
+    if (!n) return;
+    closeNote();
+    try {
+      await api.deleteNote(n.id);
+      setNotes((arr) => arr.filter((x) => x.id !== n.id));
+      if (n.files.length) {
+        /* mídia foi apagada do storage — não há undo honesto */
+        toast.show(`Nota e ${n.files.length} arquivo(s) excluídos`);
+      } else {
+        const payload: NotePayload = {
+          id: n.id, title: n.title, desc: n.desc, date: n.date,
+          links: n.links, contactIds: n.contactIds, taskId: n.taskId,
+        };
+        toast.show('Nota excluída', () => {
+          api.createNote(payload).then((volta) => setNotes((arr) => [volta, ...arr])).catch(() => {});
+        });
+      }
+    } catch (e: any) {
+      toast.show(e?.message || 'Não consegui excluir a nota');
+    }
   };
 
   const saveCat = (name: string, color: string, icon: string | null) => {
@@ -503,7 +610,9 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
   const alerts = useAlerts({
     dataRef,
     mutate,
-    suspended: () => taskModal.open || catModal.open || cfgModal.open || dragActiveRef.current,
+    suspended: () =>
+      taskModal.open || catModal.open || cfgModal.open || noteModal.open || contactsModal.open ||
+      secretsModal.open || dragActiveRef.current,
   });
   /* o primeiro toque em qualquer lugar libera o AudioContext para os alertas */
   useEffect(() => {
@@ -709,6 +818,12 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
       if (t) mutate(() => toggleDone(t, pEl.dataset.dk || null));
       return;
     }
+    /* chip de nota — ANTES do handler genérico da célula do dia */
+    const nc = target.closest('[data-open-note]') as HTMLElement | null;
+    if (nc) {
+      openNote(nc.dataset.openNote!);
+      return;
+    }
     if (target.closest('[data-drag]')) return;
     const more = target.closest('.more') as HTMLElement | null;
     if (more) {
@@ -820,6 +935,11 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
       return;
     }
     if (e.key === 'Escape') {
+      /* topo-primeiro: fecha só o modal mais alto da pilha e para
+         (a câmera intercepta o próprio Escape antes de chegar aqui) */
+      if (secretsModal.open) { setSecretsModal((s) => ({ ...s, open: false })); return; }
+      if (contactsModal.open) { setContactsModal((s) => ({ ...s, open: false })); return; }
+      if (noteModal.open) { setNoteModal((s) => ({ ...s, open: false })); return; }
       closeTask();
       closeCat();
       setCfgModal((s) => ({ ...s, open: false }));
@@ -828,13 +948,15 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
       sheetSet('peek');
       return;
     }
+    const modalAberto =
+      taskModal.open || catModal.open || cfgModal.open || noteModal.open || contactsModal.open || secretsModal.open;
     if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
-      if (taskModal.open || catModal.open || cfgModal.open) return;
+      if (modalAberto) return;
       e.preventDefault();
       searchRef.current?.focus();
       return;
     }
-    if (digitando || taskModal.open || catModal.open || cfgModal.open) return;
+    if (digitando || modalAberto) return;
     if (e.key === 'n' || e.key === 'N') {
       e.preventDefault();
       novaTarefaAqui();
@@ -1258,21 +1380,24 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
           <button className="quick-item qi-main" role="menuitem" onClick={() => { setQuickOpen(false); novaTarefaAqui(); }}>
             Nova tarefa <i className="quick-ic"><svg><use href="#i-plus" /></svg></i>
           </button>
-          <button className="quick-item soon" role="menuitem" onClick={() => { setQuickOpen(false); toast.show('Secrets — em breve'); }}>
+          <button className="quick-item qi-main" role="menuitem" onClick={() => { setQuickOpen(false); openNoteNew(); }}>
+            Nova nota <i className="quick-ic"><svg><use href="#i-note" /></svg></i>
+          </button>
+          <button className="quick-item" role="menuitem" onClick={() => { setQuickOpen(false); setSecretsModal((s) => ({ open: true, session: s.session + 1 })); }}>
             Secrets <i className="quick-ic"><svg><use href="#i-lock" /></svg></i>
           </button>
           <button className="quick-item soon" role="menuitem" onClick={() => { setQuickOpen(false); toast.show('Infos — em breve'); }}>
             Infos <i className="quick-ic"><svg><use href="#i-info" /></svg></i>
           </button>
-          <button className="quick-item soon" role="menuitem" onClick={() => { setQuickOpen(false); toast.show('Contatos — em breve'); }}>
+          <button className="quick-item" role="menuitem" onClick={() => { setQuickOpen(false); setContactsModal((s) => ({ open: true, session: s.session + 1 })); }}>
             Contatos <i className="quick-ic"><svg><use href="#i-users" /></svg></i>
           </button>
         </div>
       ) : (
-        /* web: principal central (alinhada à aba), demais acima e abaixo */
+        /* web: principais centrais (alinhadas à aba), demais acima e abaixo */
         <div className="quick-menu dock" role="menu" aria-label="Acesso rápido">
           <div className="q-orbit up">
-            <button className="quick-item soon" role="menuitem" onClick={() => { setQuickOpen(false); toast.show('Secrets — em breve'); }}>
+            <button className="quick-item" role="menuitem" onClick={() => { setQuickOpen(false); setSecretsModal((s) => ({ open: true, session: s.session + 1 })); }}>
               Secrets <i className="quick-ic"><svg><use href="#i-lock" /></svg></i>
             </button>
             <button className="quick-item soon" role="menuitem" onClick={() => { setQuickOpen(false); toast.show('Infos — em breve'); }}>
@@ -1283,9 +1408,12 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
             <button className="quick-item qi-main" role="menuitem" onClick={() => { setQuickOpen(false); novaTarefaAqui(); }}>
               Nova tarefa <i className="quick-ic"><svg><use href="#i-plus" /></svg></i>
             </button>
+            <button className="quick-item qi-main" role="menuitem" onClick={() => { setQuickOpen(false); openNoteNew(); }}>
+              Nova nota <i className="quick-ic"><svg><use href="#i-note" /></svg></i>
+            </button>
           </div>
           <div className="q-orbit down">
-            <button className="quick-item soon" role="menuitem" onClick={() => { setQuickOpen(false); toast.show('Contatos — em breve'); }}>
+            <button className="quick-item" role="menuitem" onClick={() => { setQuickOpen(false); setContactsModal((s) => ({ open: true, session: s.session + 1 })); }}>
               Contatos <i className="quick-ic"><svg><use href="#i-users" /></svg></i>
             </button>
           </div>
@@ -1304,6 +1432,38 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
         onDelete={deleteTask}
         onClose={closeTask}
         onNewCat={() => openCat(null)}
+        onInvalid={(m) => toast.show(m)}
+      />
+      <NoteModal
+        open={noteModal.open}
+        session={noteModal.session}
+        editing={noteModal.editing}
+        contacts={contacts}
+        narrow={narrow}
+        hoverable={hoverable}
+        onSave={saveNote}
+        onDelete={deleteNote}
+        onClose={closeNote}
+        onManageContacts={() => setContactsModal((s) => ({ open: true, session: s.session + 1 }))}
+        onInvalid={(m) => toast.show(m)}
+      />
+      <ContactsModal
+        open={contactsModal.open}
+        session={contactsModal.session}
+        narrow={narrow}
+        contacts={contacts}
+        onChange={setContacts}
+        onClose={() => setContactsModal((s) => ({ ...s, open: false }))}
+        onMsg={(m) => toast.show(m)}
+        onConfirm={(msg, fn) => toast.show(msg, fn, 'Excluir')}
+        onInvalid={(m) => toast.show(m)}
+      />
+      <SecretsModal
+        open={secretsModal.open}
+        session={secretsModal.session}
+        narrow={narrow}
+        onClose={() => setSecretsModal((s) => ({ ...s, open: false }))}
+        onMsg={(m) => toast.show(m)}
         onInvalid={(m) => toast.show(m)}
       />
       <CatModal

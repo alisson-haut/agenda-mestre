@@ -67,6 +67,53 @@ export interface Inst {
   dk: string;
 }
 
+/* ---------- notas (CRUD próprio, fora do full-state sync) ---------- */
+
+export interface NoteLink {
+  id: string;
+  url: string;
+  label: string;
+}
+export type NoteFileKind = 'foto' | 'video' | 'audio' | 'anexo';
+export interface NoteFile {
+  id: string;
+  noteId: string;
+  kind: NoteFileKind;
+  mime: string;
+  size: number;
+  name: string;
+  /** rota autenticada do próprio app (/api/files/:id) — nunca URL externa */
+  url: string;
+}
+export interface Note {
+  id: string;
+  title: string;
+  desc: string;
+  /** dia de criação (YMD) — a nota fica marcada nesse dia no calendário */
+  date: string;
+  links: NoteLink[];
+  /** vínculos frouxos: contato excluído vira id dangling (filtrar ao exibir) */
+  contactIds: string[];
+  /** tarefa gerada a partir da nota (id frouxo — tarefa pode não existir mais) */
+  taskId: string | null;
+  created: number;
+  updated: number;
+  files: NoteFile[];
+}
+
+/* ---------- contatos ---------- */
+
+export interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  company: string;
+  notes: string;
+  avatar: string | null;
+  created: number;
+}
+
 export const DEFAULT_PREFS: Prefs = {
   view: 'trimestre',
   theme: 'dark',

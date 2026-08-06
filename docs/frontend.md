@@ -36,6 +36,32 @@ o formulário num effect com dep `[p.session]`. Fechar por clique no backdrop ou
 sobre ConfigModal). `AlertModal` é o único com overlay próprio (`.alert-overlay`,
 z-index 500, sem clique-fora-fecha; Escape = prorrogar 10min via keyRef).
 
+## Notas, Contatos e Secrets (modais do acesso rápido)
+
+Entidades **fora do full-state**: `notes`/`contacts` são `useState` normais no
+AgendaApp, carregados no boot (`api.listNotes/listContacts`, silencioso) e
+mutados por operação (create/update/delete na API + atualização otimista).
+`NoteModal`/`ContactsModal`/`SecretsModal` seguem o padrão session/open, com
+três regras extras:
+- **Dictation monta só quando `p.open`** ({p.open && <Dictation/>}) — o e2e
+  conta `.dict-btn` e os modais ficam sempre montados.
+- **Escape é topo-primeiro** no keyRef (câmera → secrets → contacts → note →
+  resto); os três entram no guard de atalhos e no `alerts.suspended()`.
+- Id de NOTA NOVA nasce na abertura do modal (`uid()`), porque a mídia sobe
+  ANTES do save (`api.uploadNoteFile` com progresso; entradas `sending/ok/err`
+  em `media`; salvar bloqueia com envio pendente).
+Chips no calendário: `ctx.notes` + `notesByDay` (logic.ts) → `.note-chip`
+(mês, conta no maxPills), `.note-strip` (faixa sem-hora), `.dot.note`
+(trimestre/tira) e `.mini-day.has-note` (ano) — todos `[data-open-note]`,
+tratado no `viewportClick` ANTES da célula genérica; sem `data-drag` (inertes
+ao arrasto). Token de cor `--note` (âmbar). "Gerar tarefa" salva a nota, abre
+`openNew({date, title, notes})` e o `saveTask` grava o `taskId` de volta
+(`pendingNoteTask` ref). Captura: `CameraCapture` (overlay próprio z-300,
+desktop `hoverable`; Escape fecha SÓ ela via capture phase) e `AudioRecorder`
+(irmão do Dictation, sem transcrição); mobile usa `<input capture>` nativo.
+SecretsModal: cripto em `secretsCrypto.ts`, `encKey` SÓ em `useRef`, trava ao
+fechar e por inatividade (2min, badge `.lock-badge`).
+
 ## Delegação de eventos e atributos-contrato
 
 Viewport e lateral usam UM onClick com `closest()` sobre atributos de dados:
@@ -47,8 +73,13 @@ renomear quebra funcionalidades silenciosamente.
 
 Ids imperativos usados por código: `#viewport`, `#tgWrap`, `#side`,
 `#btnNewSheet`. Ids usados pelos e2e: `#tTitle #tDate #tTime #tDur #tRemind
-#aEmail #aPass #cfgCur #cfgNew #cfgNew2 #cfgSound #cfgWaNum` e classes
-`.avatar .views .pill-title .catic .dict-btn .alert-overlay .wa-qrbox`.
+#aEmail #aPass #cfgCur #cfgNew #cfgNew2 #cfgSound #cfgWaNum`, os dos modais
+novos (`#noteDlg #nTitle #nBody · #contactsDlg #ctName #ctPhone #ctEmail
+#ctCompany #ctNotes · #secretsDlg #sMaster #sMaster2 #sTitle #sSegment` —
+`#cName` é do CatModal, por isso o prefixo `ct`) e classes `.avatar .views
+.pill-title .catic .dict-btn .alert-overlay .wa-qrbox .note-chip .quick-menu
+.contact-row .secret-card .lock-badge`. Novo atributo de delegação:
+`data-open-note`.
 
 ## Comportamentos imperativos (fora do React)
 

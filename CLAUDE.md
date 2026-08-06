@@ -1,8 +1,9 @@
 # AgendaMestre — contexto para sessões de agente
 
 App de agenda/tarefas mobile-first em PT-BR (design "papel e tinta"), com
-lembretes in-app (modal+som) e notificações por e-mail (Resend) e WhatsApp
-(Evolution GO v3). Multi-usuário com auth por sessão.
+lembretes in-app (modal+som), notificações por e-mail (Resend) e WhatsApp
+(Evolution GO v3), notas com mídia (fotos/vídeo/áudio no MinIO), contatos
+(CSV) e cofre Secrets zero-knowledge. Multi-usuário com auth por sessão.
 
 ## Stack e portas
 
@@ -34,9 +35,10 @@ npm run build        # dist/ (front) + dist-server/ (API bundle)
 4. **Estado do cliente é mutável** (`dataRef` + `mutate()` + bump). O sync é
    full-state: `PUT /api/state` substitui TODAS as tasks/cats do usuário —
    campo novo de tarefa exige round-trip completo (checklist em docs/frontend.md).
-5. **Novo campo/feature = atualizar e rodar a suíte e2e** (26 testes, conta
-   nova por teste). Ids de elementos (`#tTitle`, `#tRemind`, `.avatar`...) são
-   contratos dos testes — não renomear sem atualizar `e2e/`.
+5. **Novo campo/feature = atualizar e rodar a suíte e2e** (6 specs × 2
+   projetos, conta nova por teste). Ids de elementos (`#tTitle`, `#tRemind`,
+   `.avatar`, `#nTitle`, `#sMaster`...) são contratos dos testes — não
+   renomear sem atualizar `e2e/`.
 6. Mensagens/textos da UI em **PT-BR**, tom direto; fontes **Sora (display) +
    Inter (UI) + JetBrains Mono** e paleta oficial (Verde Mestre #00E09A no
    dark com texto escuro; Verde Profundo #0A7F64 no light — #00E09A no light

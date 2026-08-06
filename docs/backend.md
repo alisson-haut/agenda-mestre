@@ -39,8 +39,9 @@ email_verified); vincula por google_id ou e-mail existente, cria conta com
 senha aleatória se necessário.
 
 **Headers (prod)**: HSTS + CSP (self + Google Fonts + data:/blob: para
-imagens) + Permissions-Policy (mic=self — o ditado precisa). Em dev não há
-CSP (Vite HMR; o HTML nem passa pelo Express).
+imagens e `media-src` para áudio/vídeo) + Permissions-Policy (mic=self e
+camera=self — ditado e câmera das notas). Em dev não há CSP (Vite HMR; o
+HTML nem passa pelo Express) — **testar câmera/vídeo via `npm run preview`**.
 
 ## Estado (`server/state.ts`)
 
@@ -48,6 +49,42 @@ CSP (Vite HMR; o HTML nem passa pelo Express).
 cor/data/hora, remind 0..10080, cats ≤4, icon data-URL ≤120k) e substitui tudo
 em transação. **Não** criar rotas de escrita paralelas para tasks/cats — o
 próximo PUT do cliente sobrescreveria; o caminho de escrita é um só.
+
+## Notas, contatos e arquivos (`server/notes.ts`, `server/contacts.ts`, `server/files/`)
+
+Entidades **fora do full-state**: CRUD por operação, todas `requireAuth`,
+validação manual estilo `cleanTask`, erros PT-BR. Vínculos FROUXOS por design:
+`notes.task_id`/`notes.contact_ids` sem FK (o PUT /api/state recria tasks) e
+`note_files` sem FK para notes (o upload acontece ANTES do save — id de nota
+gerado no cliente; órfãos >24h sem nota são varridos por `startOrphanSweep`).
+
+**Storage** (`server/files/storage.ts`): adapter MinIO (envs `MINIO_SERVER_URL`
+/`MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`/`MINIO_BUCKET`) ou disco
+(dev `.data/files`, prod opt-in `FILES_DIR`); sem nada em prod → 503 padrão.
+Chave `<userId>/<noteId>/<fileId>.<ext>` — userId SEMPRE da sessão, ext só do
+mapa MIME. **REGRA: storage é I/O de rede — NUNCA dentro de `tx()`** (delete de
+nota: SELECT chaves → DELETE rows → objetos por último, best-effort).
+
+**Upload** (`POST /api/files/notes/:id`): corpo cru em STREAMING (o
+express.json global ignora não-JSON — não adicionar body-parser genérico!),
+Content-Length obrigatório, allowlist MIME por kind (SVG/HTML proibidos —
+XSS), tetos foto 15MB/áudio 30MB/vídeo 95MB/anexo 25MB + quota por usuário.
+**Download** (`GET /api/files/:id`): dono via sessão, Range/206 (vídeo no
+Safari exige), `Content-Disposition: attachment` para anexos, cache
+private/immutable.
+
+## Cofre Secrets (`server/secrets.ts` + `client/src/agenda/secretsCrypto.ts`)
+
+**Zero-knowledge**: o cliente deriva PBKDF2-SHA256 600k (senha-mestra + salt)
+→ HKDF separa EK (AES-256-GCM, cifra os itens NO NAVEGADOR) e AK (authKey que
+vai ao servidor só para verificação — guardado como bcrypt). O banco só tem
+salt/iterations (públicos) e ciphertexts opacos — título/segmento ficam DENTRO
+do ciphertext. Unlock (`limited` 5/15min, 401 genérico, `audit`) devolve um
+**token de 2min (TTL deslizante, Map em memória — 1 processo)** exigido nos
+writes via `X-Vault-Token`. Rekey/reset exigem authKey fresco; rekey é atômico
+(confere o conjunto de ids no tx). Esquecer a senha-mestra = perda dos itens
+(reset apaga tudo — não usa senha da conta: contas Google têm senha aleatória).
+NUNCA logar authKey/token/ciphertext.
 
 ## Rotas de notificação (`server/notify/routes.ts`)
 

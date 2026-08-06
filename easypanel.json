@@ -27,7 +27,7 @@
           "type": "dockerfile",
           "file": "Dockerfile"
         },
-        "env": "NODE_ENV=production\nPORT=5192\nDATABASE_URL=postgres://postgres:TROQUE-ESTA-SENHA@agendamestre_db:5432/agendamestre\nGROQ_API_KEY=SUA-CHAVE-GROQ\nEVOLUTION_BASE_URL=https://seu-servidor-evolution.exemplo.com.br\nEVOLUTION_API_KEY=SUA-CHAVE-EVOLUTION\nRESEND_API_KEY=SUA-CHAVE-RESEND\nRESEND_FROM=AgendaMestre <lembretes@seudominio.com.br>\nRESEND_FROM_AUTH=AgendaMestre <no-reply@seudominio.com.br>\nGOOGLE_CLIENT_ID=\nGOOGLE_CLIENT_SECRET=\nAPP_URL=https://agenda.seudominio.com.br",
+        "env": "NODE_ENV=production\nPORT=5192\nDATABASE_URL=postgres://postgres:TROQUE-ESTA-SENHA@agendamestre_db:5432/agendamestre\nGROQ_API_KEY=SUA-CHAVE-GROQ\nEVOLUTION_BASE_URL=https://seu-servidor-evolution.exemplo.com.br\nEVOLUTION_API_KEY=SUA-CHAVE-EVOLUTION\nRESEND_API_KEY=SUA-CHAVE-RESEND\nRESEND_FROM=AgendaMestre <lembretes@seudominio.com.br>\nRESEND_FROM_AUTH=AgendaMestre <no-reply@seudominio.com.br>\nMINIO_SERVER_URL=https://minio.seudominio.com.br\nMINIO_ROOT_USER=SEU-USUARIO-MINIO\nMINIO_ROOT_PASSWORD=SUA-SENHA-MINIO\nMINIO_BUCKET=agendamestre-files\nGOOGLE_CLIENT_ID=\nGOOGLE_CLIENT_SECRET=\nAPP_URL=https://agenda.seudominio.com.br",
         "proxy": {
           "port": 5192,
           "secure": true

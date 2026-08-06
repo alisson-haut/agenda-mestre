@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { taskCats, type Cat, type Inst, type Task } from './types';
 import { addDays, dayDiff, DIA1, DIA3, hhmmOf, isWeekend, MES3, MESES, minutesOf, pad, parseYMD, today, ymd } from './dates';
-import { byDay, catOf, dateLabelShort, isDone, layoutOverlaps, weekStartOf, wdayOrder, type Ctx, type EvBox } from './logic';
+import { byDay, catOf, dateLabelShort, isDone, layoutOverlaps, notesByDay, weekStartOf, wdayOrder, type Ctx, type EvBox } from './logic';
+import type { Note } from './types';
+
+/* chip de nota — inerte ao drag&drop (sem data-drag); o clique é tratado
+   pelo viewportClick via data-open-note ANTES do handler genérico do dia */
+function NoteChip({ n, strip = false }: { n: Note; strip?: boolean }) {
+  return (
+    <button className={strip ? 'note-strip' : 'note-chip'} data-open-note={n.id} title={n.title || 'Nota'}>
+      <svg><use href="#i-note" /></svg>
+      <span>{n.title || 'Nota'}</span>
+    </button>
+  );
+}
 
 export const HOUR = 56; // deve casar com --hour no CSS
 
@@ -96,6 +108,7 @@ export function MonthView({ ctx, anchor, selDay, weekStart, narrow }: { ctx: Ctx
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const gStart = weekStartOf(first, weekStart);
   const map = byDay(ctx, gStart, addDays(gStart, 41));
+  const nmap = notesByDay(ctx, gStart, addDays(gStart, 41));
   const tk = ymd(today());
   const [maxPills, setMaxPills] = useState(99);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -123,8 +136,14 @@ export function MonthView({ ctx, anchor, selDay, weekStart, narrow }: { ctx: Ctx
       const k = ymd(d);
       const out = d.getMonth() !== anchor.getMonth();
       const items = map[k] || [];
-      const over = !narrow && items.length > maxPills;
-      const shown = over ? items.slice(0, Math.max(1, maxPills - 1)) : items;
+      const dayNotes = nmap[k] || [];
+      /* notas ocupam as mesmas linhas de 21px das pílulas — orçamento único */
+      const totalRows = dayNotes.length + items.length;
+      const over = !narrow && totalRows > maxPills;
+      const budget = over ? Math.max(1, maxPills - 1) : totalRows;
+      const shownNotes = dayNotes.slice(0, budget);
+      const shown = items.slice(0, Math.max(0, budget - shownNotes.length));
+      const escondidos = totalRows - shownNotes.length - shown.length;
       cells.push(
         <div
           key={k}
@@ -140,11 +159,14 @@ export function MonthView({ ctx, anchor, selDay, weekStart, narrow }: { ctx: Ctx
             <svg><use href="#i-plus" /></svg>
           </button>
           <div className="cell-pills">
+            {shownNotes.map((n) => (
+              <NoteChip key={'n' + n.id} n={n} />
+            ))}
             {shown.map((x) => (
               <Pill key={x.t.id + x.dk} t={x.t} dk={x.dk} variant="mini" cats={ctx.cats} />
             ))}
             {over && (
-              <button className="more" data-openday={k}>+{items.length - shown.length} mais</button>
+              <button className="more" data-openday={k}>+{escondidos} mais</button>
             )}
           </div>
         </div>,
@@ -174,6 +196,7 @@ export function MiniMonth({ mDate, ctx, weekStart, selDay, heat = false, fixed6 
     ? 6
     : Math.ceil((((first.getDay() - weekStart + 7) % 7) + new Date(mDate.getFullYear(), mDate.getMonth() + 1, 0).getDate()) / 7);
   const map = byDay(ctx, gStart, addDays(gStart, weeks * 7 - 1));
+  const nmap = notesByDay(ctx, gStart, addDays(gStart, weeks * 7 - 1));
   const tk = ymd(today());
   const tnow = today();
   let total = 0;
@@ -183,16 +206,17 @@ export function MiniMonth({ mDate, ctx, weekStart, selDay, heat = false, fixed6 
     const k = ymd(d);
     const out = d.getMonth() !== mDate.getMonth();
     const items = out ? [] : map[k] || [];
+    const temNota = !out && !!(nmap[k] || []).length;
     if (!out) total += items.length;
     if (heat) {
       const lvl = Math.min(4, items.length);
       cells.push(
         <button
           key={k}
-          className={`mini-day ${out ? 'out' : 'heat' + lvl} ${k === tk ? 'today' : ''} ${k === selDay ? 'sel' : ''}`}
+          className={`mini-day ${out ? 'out' : 'heat' + lvl} ${temNota ? 'has-note' : ''} ${k === tk ? 'today' : ''} ${k === selDay ? 'sel' : ''}`}
           data-day={k}
           data-drop-day={k}
-          title={`${items.length} tarefa(s) em ${d.getDate()}/${d.getMonth() + 1}`}
+          title={`${items.length} tarefa(s)${temNota ? ' · nota' : ''} em ${d.getDate()}/${d.getMonth() + 1}`}
         >
           <span>{d.getDate()}</span>
         </button>,
@@ -201,6 +225,7 @@ export function MiniMonth({ mDate, ctx, weekStart, selDay, heat = false, fixed6 
     }
     const seen: string[] = [];
     const dots: ReactNode[] = [];
+    if (temNota) dots.push(<i key="nota" className="dot note" />);
     for (const x of items) {
       const c = catOf(ctx.cats, x.t.cat);
       if (!seen.includes(c.color)) {
@@ -249,6 +274,7 @@ function DayStrip({ day, ctx, weekStart }: { day: Date; ctx: Ctx; weekStart: num
   const tk = ymd(today());
   const sel = ymd(day);
   const map = byDay(ctx, s, addDays(s, 6));
+  const nmap = notesByDay(ctx, s, addDays(s, 6));
   return (
     <div className="strip">
       {Array.from({ length: 7 }, (_, i) => {
@@ -265,6 +291,7 @@ function DayStrip({ day, ctx, weekStart }: { day: Date; ctx: Ctx; weekStart: num
             <span className="sd-w">{DIA3[x.getDay()]}</span>
             <span className="sd-n">{x.getDate()}</span>
             <span className="dots">
+              {!!(nmap[k] || []).length && <i className="dot note" />}
               {cores.map((c) => (
                 <i key={c} className="dot" style={{ '--c': c } as CSSProperties} />
               ))}
@@ -278,6 +305,7 @@ function DayStrip({ day, ctx, weekStart }: { day: Date; ctx: Ctx; weekStart: num
 
 export function TimeGrid({ days, ctx, weekStart, narrow }: { days: Date[]; ctx: Ctx; weekStart: number; narrow: boolean }) {
   const map = byDay(ctx, days[0], days[days.length - 1]);
+  const nmap = notesByDay(ctx, days[0], days[days.length - 1]);
   const tk = ymd(today());
   const colw = narrow && days.length > 1 ? 106 : 0;
   const cols = colw ? `52px repeat(${days.length},${colw}px)` : `52px repeat(${days.length},minmax(0,1fr))`;
@@ -326,8 +354,12 @@ export function TimeGrid({ days, ctx, weekStart, narrow }: { days: Date[]; ctx: 
             {days.map((d) => {
               const k = ymd(d);
               const items = (map[k] || []).filter((x) => !x.t.time);
+              const dayNotes = nmap[k] || [];
               return (
                 <div key={k} className="tg-allcol" data-drop-day={k}>
+                  {dayNotes.map((n) => (
+                    <NoteChip key={'n' + n.id} n={n} strip />
+                  ))}
                   {items.map((x) => (
                     <Pill key={x.t.id + x.dk} t={x.t} dk={x.dk} variant="allday" cats={ctx.cats} />
                   ))}

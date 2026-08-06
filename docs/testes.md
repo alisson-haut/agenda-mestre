@@ -10,7 +10,8 @@ Config (`playwright.config.ts`): baseURL 5192, projetos **desktop** e
 **mobile (Pixel 7)** rodam os MESMOS testes; `webServer` sobe `npm run dev` se
 não estiver rodando; `workers: 2` + `retries: 1` — a máquina de dev roda tudo
 junto (Vite+API+PGlite de 1 conexão) e mais paralelismo gera flake ambiental,
-não bug. Falha 2x seguidas = problema real.
+não bug. Falha 2x seguidas = problema real. O projeto desktop roda com
+`--use-fake-{ui,device}-for-media-stream` (câmera/mic falsos, sem prompt).
 
 ## Padrões (seguir ao escrever teste novo)
 
@@ -35,6 +36,15 @@ não bug. Falha 2x seguidas = problema real.
 |---|---|
 | `agenda.spec.ts` | registro/login/logout, senha errada, criar tarefa + persistência, troca de senha, ditado presente, 4 etiquetas máx |
 | `alerts.spec.ts` | modal de alerta (dispara/ack persiste/snooze/prioridade), lembrete exige hora, settings de notificação (mock), fluxo QR (mock) |
+| `auth-reset.spec.ts` | recuperação de senha completa via devLink, uso único, rate limit do forgot, botão Google desabilitado |
+| `notes.spec.ts` | criar nota → chip no mês → reabrir pelo chip, persistência, foto (upload real p/ storage), gerar tarefa com vínculo |
+| `contacts.spec.ts` | CRUD de contato, download do modelo CSV, import (aspas/linha inválida), vínculo nota↔contato |
+| `secrets.spec.ts` | setup do cofre, item com campo secreto, trava ao fechar, senha errada/certa, copiar, zero-knowledge (servidor sem plaintext), rate limit do unlock |
+
+Observações dos specs novos: a derivação PBKDF2 (600k) leva ~0,3–3s — asserts
+do cofre usam timeout 20s; upload de foto usa `setInputFiles` no input oculto
+(mesmo caminho do picker); "Nova nota"/"Nova tarefa" não colidem no matcher
+por nome.
 
 ## Worker de mensageria (teste manual, sem Playwright)
 

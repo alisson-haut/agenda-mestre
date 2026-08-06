@@ -76,7 +76,35 @@ Dica: se o Resend sugerir `_dmarc` com `p=reject`, comece com
 domínio verificado, o Resend entrega apenas para o e-mail da própria conta
 (modo sandbox).
 
-## 4. Atualizações
+## 4. Arquivos e mídia (MinIO)
+
+As fotos/vídeos/áudios das notas ficam num **MinIO** (S3) ao lado do app.
+O navegador nunca fala com o MinIO — todo upload/download passa pela API
+autenticada (`/api/files`), então as credenciais ficam só no servidor.
+
+**No EasyPanel** (criação pela UI):
+1. **+ Service → App** → Source: **Docker Image** `minio/minio` (fixe uma
+   release, ex.: `minio/minio:RELEASE.2025-04-22T22-12-26Z`).
+2. Command: `minio server /data --console-address :9001`.
+3. Environment: `MINIO_ROOT_USER` e `MINIO_ROOT_PASSWORD` (senha forte).
+4. Mounts: volume em `/data` (é onde os arquivos vivem — inclua no backup).
+5. Domínio: opcional. **Sem domínio** o MinIO fica acessível só na rede
+   interna (`<projeto>_<serviço>:9000` — mais seguro); **com domínio HTTPS**
+   você pode acessar o console e usar a mesma URL no `MINIO_SERVER_URL`.
+6. No serviço **app**, aponte as envs `MINIO_*` (tabela abaixo). O bucket é
+   criado automaticamente no primeiro boot, sempre privado.
+
+Notas de segurança e limites:
+- Objetos são gravados por usuário (`<userId>/...`) e toda leitura valida o
+  dono pela sessão — um usuário jamais enxerga arquivo de outro.
+- Teto de vídeo padrão **95MB**: com o domínio do app proxiado pelo
+  Cloudflare (plano free), corpos acima de 100MB são recusados pelo proxy.
+  Sem Cloudflare na frente, aumente com `FILES_MAX_VIDEO_MB`.
+- Endurecimento opcional: crie uma access key dedicada só ao bucket do app
+  (console do MinIO → Access Keys) e use-a no lugar das credenciais root.
+- Alternativa sem MinIO: monte um volume e defina `FILES_DIR` (disco local).
+
+## 5. Atualizações
 
 Com `autoDeploy` ligado, cada `git push` na `main` redisponibiliza o app.
 Manual: botão **Deploy** no serviço app.
@@ -107,6 +135,12 @@ O app sobe em `http://IP-DA-VPS:5192`.
 | `NOTIFY_DISABLED` | não | `1` desliga o worker (útil em CI) |
 | `NOTIFY_*` (limites) | não | Tetos de segurança do motor de mensageria (janela/min, diário, global, espaçamento) — padrões conservadores; ver [docs/mensageria.md](docs/mensageria.md) |
 | `RESEND_FROM_AUTH` | não | Remetente dos e-mails de conta (ex.: `AgendaMestre <no-reply@seudominio.com.br>`) |
+| `MINIO_SERVER_URL` | p/ mídia | URL do MinIO — pública (`https://minio.seudominio.com.br`) ou interna (`http://<projeto>_minio:9000`) |
+| `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | p/ mídia | Credenciais do MinIO (ou de uma access key dedicada ao bucket) |
+| `MINIO_BUCKET` | não | Nome do bucket (padrão `agendamestre-files`, criado no boot) |
+| `FILES_DIR` | não | Alternativa ao MinIO: pasta em disco (monte um volume) |
+| `FILES_USER_QUOTA_MB` | não | Cota de mídia por usuário (padrão 500) |
+| `FILES_MAX_VIDEO_MB` | não | Teto de vídeo (padrão 95 — limite do proxy Cloudflare free é 100MB) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | não | Ativam o botão "Continuar com Google" — sem eles, o botão fica desabilitado |
 
 ## Login com Google (opcional)
