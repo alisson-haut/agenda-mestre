@@ -52,6 +52,15 @@ gerado por nós e guardado em `notify_settings` (nunca vai ao browser).
 3. Se nem a instância existe: conferir `EVOLUTION_BASE_URL`/`EVOLUTION_API_KEY`
    no env do serviço app e os logs do container durante o clique (evoFetch
    loga o erro real).
+4. **Teste decisivo** (isola app vs servidor): direto na API do Evolution,
+   `POST /instance/create {name,token}` → aguardar → `GET /instance/qr` com o
+   token. Se o próprio servidor responder `"no QR code available"` para
+   sempre (mesmo após `POST /instance/connect {immediate:true}`), o problema
+   é o SERVIDOR Evolution — a ponte WhatsApp travou (status fica
+   `Connected:false`, `jid` vazio). Cura padrão: **reiniciar o serviço
+   Evolution** no painel; se persistir, ver os logs dele e conferir se a
+   imagem não foi atualizada para uma versão incompatível. Nenhum redeploy
+   do AgendaMestre resolve isso.
 
 ## Resend — e-mail (`server/notify/resend.ts`)
 
