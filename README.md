@@ -77,8 +77,12 @@ e não serve o front. As tabelas são criadas automaticamente no primeiro boot.
 
 ## Deploy
 
-Guia completo em [DEPLOY.md](DEPLOY.md) — EasyPanel via [`easypanel.json`](easypanel.json),
-`docker-compose.yml` como alternativa e passo a passo do DNS no Cloudflare.
+**Instalação em 1 passo**: abra [`installer/index.html`](installer/index.html)
+no navegador (100% offline) — ele gera as senhas e monta o schema completo do
+EasyPanel (app + Postgres + MinIO) para colar em **Create from Schema**.
+
+Guia completo em [DEPLOY.md](DEPLOY.md) — gerador, [`easypanel.json`](easypanel.json)
+manual, `docker-compose.yml` como alternativa e passo a passo do DNS no Cloudflare.
 
 ## Documentação
 
@@ -96,6 +100,7 @@ server/          Express (auth, estado, notas/contatos/secrets, mensageria)
 server/files/    Storage de mídia (MinIO/S3 ou disco) atrás de proxy autenticado
 e2e/             Testes Playwright (6 specs × desktop e mobile)
 Dockerfile       Build multi-stage (imagem final só com deps de produção)
-easypanel.json   Schema de instalação no EasyPanel
+easypanel.json   Schema de instalação no EasyPanel (exemplo com placeholders)
+installer/       Gerador do schema de instalação — página única, offline
 docker-compose.yml  App + Postgres + MinIO com um comando
 ```

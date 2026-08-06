@@ -198,6 +198,19 @@ async function createDB(): Promise<DB> {
         }
       },
     };
+    /* instalação nova: o Postgres pode subir DEPOIS do app (EasyPanel não
+       ordena serviços) — espera com backoff (~2min) antes de desistir */
+    for (let i = 0; i < 10; i++) {
+      try {
+        await db.query('SELECT 1');
+        break;
+      } catch (e: any) {
+        if (i === 9) throw e;
+        const espera = Math.min(2000 * (i + 1), 15_000);
+        console.error(`banco: aguardando o Postgres (tentativa ${i + 1}/10):`, e?.message || e);
+        await new Promise((r) => setTimeout(r, espera));
+      }
+    }
   } else {
     // dev/teste: Postgres embutido em .data/pglite
     const { mkdirSync } = await import('node:fs');

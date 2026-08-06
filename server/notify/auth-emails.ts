@@ -5,8 +5,18 @@ import { appUrl, EMAIL_COLORS as C } from './templates.js';
 const esc = (s: string) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-export const authFrom = () =>
-  process.env.RESEND_FROM_AUTH || 'AgendaMestre <no-reply@agendamestre.app.br>';
+/* remetente dos e-mails de conta: env explícita → derivado do RESEND_FROM
+   (mesmo domínio, caixa no-reply) → fallback da marca. A derivação evita o
+   erro clássico de instalação nova: RESEND_FROM configurado e reset de senha
+   saindo por um domínio de terceiro não verificado. */
+export function authFrom(): string {
+  if (process.env.RESEND_FROM_AUTH) return process.env.RESEND_FROM_AUTH;
+  const base = process.env.RESEND_FROM || '';
+  const m = base.match(/^\s*(?:(.*?)\s*<\s*[^@\s<>]+@([^\s<>]+)\s*>|[^@\s<>]+@([\S]+))\s*$/);
+  const dominio = m?.[2] || m?.[3];
+  if (dominio) return `${(m?.[1] || 'AgendaMestre').trim() || 'AgendaMestre'} <no-reply@${dominio}>`;
+  return 'AgendaMestre <no-reply@agendamestre.app.br>';
+}
 
 /* cabeçalho de marca compatível com clientes de e-mail (sem imagens externas) */
 export function emailBrandHeader(): string {

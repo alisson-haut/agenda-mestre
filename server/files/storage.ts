@@ -48,11 +48,18 @@ async function create(): Promise<Storage> {
 }
 
 export function getStorage(): Promise<Storage> {
-  if (!singleton) singleton = create();
+  if (!singleton)
+    singleton = create().catch((e) => {
+      /* não cachear a falha: a próxima chamada tenta de novo */
+      singleton = null;
+      throw e;
+    });
   return singleton;
 }
 
-/* boot: cria bucket/pasta com retry — o MinIO pode subir depois do app */
+/* boot: cria bucket/pasta — o MinIO pode subir depois do app (instalação
+   nova no EasyPanel). 5 tentativas rápidas e, se ainda falhar, insiste a
+   cada 60s até conseguir: o bucket TEM que nascer sem intervenção manual. */
 export async function initStorage(): Promise<void> {
   if (!storageConfigured()) return;
   for (let i = 0; i < 5; i++) {
@@ -61,9 +68,26 @@ export async function initStorage(): Promise<void> {
       if ('init' in s && typeof (s as any).init === 'function') await (s as any).init();
       return;
     } catch (e: any) {
+      singleton = null;
       console.error(`storage: init falhou (tentativa ${i + 1}/5):`, e?.message || e);
-      if (i === 4) return;
-      await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+      if (i < 4) await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
     }
   }
+  console.error('storage: sem sucesso no boot — nova tentativa a cada 60s');
+  const insistir = () => {
+    setTimeout(() => {
+      void (async () => {
+        try {
+          const s = await getStorage();
+          if ('init' in s && typeof (s as any).init === 'function') await (s as any).init();
+          console.log('storage: recuperado');
+        } catch (e: any) {
+          singleton = null;
+          console.error('storage: ainda indisponível:', e?.message || e);
+          insistir();
+        }
+      })();
+    }, 60_000).unref?.();
+  };
+  insistir();
 }

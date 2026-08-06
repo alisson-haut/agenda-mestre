@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Instalador AgendaMestre — gerador de schema do EasyPanel</title>
+  <!-- 100% offline por design: nenhum request externo (fontes do sistema).
+       Abra este arquivo direto no navegador (file://) — nada sai da página. -->
+  <style>
+/* Instalador AgendaMestre — visual da marca, 100% offline (fontes do sistema:
+   Sora/Inter quando instaladas, senão a stack padrão do SO). */
+
+:root{
+  --bg:#0B0F12; --surface:#11161B; --surface-2:#151B20; --surface-3:#1B222A;
+  --line:#232B33; --line-2:#333D47;
+  --ink:#F2F4F7; --ink-2:#A7AFB8; --ink-3:#6B7683;
+  --brand:#00E09A; --brand-2:#33E9B1; --brand-soft:#0E2A21;
+  --on-brand:#04231C; --danger:#E56B5C; --warn:#D9A85C;
+  --r-s:8px; --r-m:12px; --r-l:16px;
+  --font-display:"Sora","Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-ui:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--ink);font-family:var(--font-ui);
+  font-size:15px;line-height:1.55;min-height:100vh;
+  padding:28px 16px 60px;
+}
+main,header.topo,footer.rodape{max-width:820px;margin:0 auto}
+
+/* ---------- topo ---------- */
+.topo{margin-bottom:22px}
+.marca{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.marca-tile{
+  width:34px;height:34px;border-radius:10px;background:var(--brand);color:var(--on-brand);
+  display:grid;place-items:center;font-size:26px;font-weight:700;line-height:1;
+}
+.marca-nome{font-family:var(--font-display);font-weight:600;font-size:19px;letter-spacing:-.01em}
+.marca-nome i{font-style:normal;color:var(--brand)}
+h1{font-family:var(--font-display);font-size:26px;letter-spacing:-.02em;margin-bottom:10px}
+.sub{color:var(--ink-2);max-width:64ch}
+.badge-offline{
+  display:inline-block;margin-top:14px;padding:8px 14px;border-radius:99px;
+  background:var(--brand-soft);color:var(--brand-2);font-size:13px;font-weight:600;
+  border:1px solid color-mix(in srgb,var(--brand) 30%,transparent);
+}
+
+/* ---------- cartões e campos ---------- */
+.cartao{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);
+  padding:20px 22px;margin-bottom:16px;position:relative;overflow:hidden;
+}
+.cartao::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--brand) 45%,transparent),transparent);
+}
+h2{font-family:var(--font-display);font-size:17px;letter-spacing:-.015em;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+h3{font-family:var(--font-display);font-size:15px;margin:22px 0 8px}
+.num{
+  width:26px;height:26px;border-radius:99px;background:var(--brand);color:var(--on-brand);
+  display:inline-grid;place-items:center;font-size:13px;font-weight:700;flex:none;
+}
+.obr{font-style:normal;font-size:11px;font-weight:600;color:var(--warn);text-transform:uppercase;letter-spacing:.08em}
+.opc{font-style:normal;font-size:11px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em}
+.grade2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grade3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:640px){.grade2,.grade3{grid-template-columns:1fr}}
+.campo{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;min-width:0}
+label{
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);
+}
+input{
+  width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-m);
+  padding:11px 13px;font-size:15px;color:var(--ink);font-family:var(--font-ui);
+}
+input:focus{outline:none;border-color:var(--brand);background:var(--surface)}
+input[aria-invalid="true"]{border-color:var(--danger)}
+input[readonly]{font-family:var(--font-mono);font-size:13.5px;color:var(--brand-2)}
+input::placeholder{color:var(--ink-3)}
+.ajuda{font-size:12px;color:var(--ink-3)}
+.erro{font-size:12px;color:var(--danger);min-height:0;display:none}
+.erro.on{display:block}
+.nota{font-size:13px;color:var(--ink-2);margin-bottom:12px;line-height:1.6}
+.nota code,.passos code,.aviso code{
+  font-family:var(--font-mono);font-size:12px;background:var(--surface-3);
+  padding:2px 6px;border-radius:6px;color:var(--brand-2);
+}
+.checa{display:flex;align-items:center;gap:9px;font-size:14.5px;font-weight:600;margin-bottom:12px;cursor:pointer}
+.checa input{width:auto;accent-color:var(--brand)}
+.linha-cred{display:flex;gap:6px;align-items:center}
+.linha-cred input{flex:1;min-width:0}
+.btn-mini{
+  flex:none;width:40px;height:40px;border-radius:var(--r-s);border:1px solid var(--line);
+  background:var(--surface-2);color:var(--ink-2);font-size:15px;cursor:pointer;
+}
+.btn-mini:hover{color:var(--ink);border-color:var(--line-2)}
+.aviso{
+  background:color-mix(in srgb,var(--warn) 13%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);
+  border-radius:var(--r-m);padding:10px 13px;font-size:13px;line-height:1.55;margin-bottom:10px;
+}
+.oculto{display:none}
+
+/* ---------- integrações (details) ---------- */
+details{
+  border:1px solid var(--line);border-radius:var(--r-m);margin-bottom:10px;
+  background:var(--surface-2);overflow:hidden;
+}
+details[open]{background:var(--surface)}
+summary{
+  padding:12px 14px;font-weight:600;font-size:14.5px;cursor:pointer;list-style:none;
+  display:flex;align-items:center;gap:8px;
+}
+summary::before{content:"▸";color:var(--brand);transition:transform .15s ease}
+details[open] summary::before{transform:rotate(90deg)}
+details > :not(summary){margin-left:14px;margin-right:14px}
+details > :last-child{margin-bottom:14px}
+
+/* ---------- saída ---------- */
+.acoes{display:flex;gap:9px;flex-wrap:wrap;margin:6px 0 14px}
+.btn,.btn-primario{
+  min-height:44px;padding:0 18px;border-radius:var(--r-m);font-size:14.5px;font-weight:600;
+  border:1px solid var(--line-2);background:var(--surface-2);color:var(--ink);cursor:pointer;
+  font-family:var(--font-ui);
+}
+.btn:hover{border-color:var(--brand)}
+.btn-primario{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.btn-primario:hover{background:var(--brand-2)}
+.btn:disabled,.btn-primario:disabled{opacity:.45;cursor:not-allowed}
+#outJson{
+  background:#07090B;border:1px solid var(--line);border-radius:var(--r-m);
+  padding:14px;font-family:var(--font-mono);font-size:12px;line-height:1.5;
+  overflow:auto;max-height:420px;color:#B7C4CE;white-space:pre;
+}
+.passos{margin:0 0 8px 20px;display:flex;flex-direction:column;gap:7px;font-size:14px;color:var(--ink-2)}
+.passos b{color:var(--ink)}
+#listaAvisos .aviso{margin-bottom:8px}
+
+/* ---------- rodapé ---------- */
+.rodape{margin-top:26px;text-align:center;font-size:12.5px;color:var(--ink-3)}
+.rodape a{color:var(--brand-2)}
+
+  </style>
+  
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <span class="marca-tile">·</span>
+      <span class="marca-nome">AgendaMestre<i>·</i></span>
+    </div>
+    <h1>Instalador — gerador de schema do EasyPanel</h1>
+    <p class="sub">
+      Preencha os campos, e esta página monta o JSON <b>Create from Schema</b> que instala
+      o AgendaMestre completo de uma vez: app (build do GitHub) + Postgres + MinIO,
+      com senhas geradas aqui e todas as variáveis já configuradas. Migrações de banco,
+      bucket de mídia e workers de notificação sobem sozinhos no primeiro boot.
+    </p>
+    <p class="badge-offline">🔒 100% offline — suas chaves e senhas nunca saem desta página
+      (confira: a aba Rede do navegador fica vazia).</p>
+  </header>
+
+  <main>
+    <!-- ============ 1. IDENTIDADE ============ -->
+    <section class="cartao">
+      <h2><span class="num">1</span> Identidade</h2>
+      <div class="grade2">
+        <div class="campo">
+          <label for="gProjeto">Nome do projeto no EasyPanel</label>
+          <input id="gProjeto" value="agendamestre" autocomplete="off" spellcheck="false" />
+          <small class="ajuda">minúsculas, números, - e _ — vira o prefixo dos hosts internos</small>
+          <small class="erro" data-erro="gProjeto"></small>
+        </div>
+        <div class="campo">
+          <label for="gBranch">Branch</label>
+          <input id="gBranch" value="main" autocomplete="off" spellcheck="false" />
+          <small class="erro" data-erro="gBranch"></small>
+        </div>
+      </div>
+      <div class="grade2">
+        <div class="campo">
+          <label for="gOwner">GitHub — usuário/organização</label>
+          <input id="gOwner" value="alisson-haut" autocomplete="off" spellcheck="false" />
+          <small class="erro" data-erro="gOwner"></small>
+        </div>
+        <div class="campo">
+          <label for="gRepo">GitHub — repositório</label>
+          <input id="gRepo" value="agenda-mestre" autocomplete="off" spellcheck="false" />
+          <small class="erro" data-erro="gRepo"></small>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 2. DOMÍNIO ============ -->
+    <section class="cartao">
+      <h2><span class="num">2</span> Domínio do app <em class="obr">obrigatório</em></h2>
+      <div class="campo">
+        <label for="gDominio">Domínio (sem https://)</label>
+        <input id="gDominio" placeholder="agenda.seudominio.com.br" autocomplete="off" spellcheck="false" inputmode="url" />
+        <small class="ajuda">aponte o DNS deste domínio para a VPS ANTES de instalar — o certificado HTTPS depende disso</small>
+        <small class="erro" data-erro="gDominio"></small>
+      </div>
+    </section>
+
+    <!-- ============ 3. BANCO ============ -->
+    <section class="cartao">
+      <h2><span class="num">3</span> Banco de dados (Postgres)</h2>
+      <p class="nota">Usuário <code>postgres</code> e banco com o nome do projeto — os mesmos
+        padrões do EasyPanel, declarados explicitamente no schema: a conexão já nasce certa.</p>
+      <div class="campo">
+        <label for="gPgPass">Senha do Postgres (gerada aqui)</label>
+        <div class="linha-cred">
+          <input id="gPgPass" type="password" readonly autocomplete="off" />
+          <button type="button" class="btn-mini" data-olho="gPgPass" title="Mostrar/ocultar">👁</button>
+          <button type="button" class="btn-mini" data-copia="gPgPass" title="Copiar">⧉</button>
+          <button type="button" class="btn-mini" data-regen="gPgPass" title="Gerar outra">↻</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 4. MINIO ============ -->
+    <section class="cartao">
+      <h2><span class="num">4</span> Arquivos e mídia (MinIO)</h2>
+      <label class="checa">
+        <input type="checkbox" id="chkMinio" checked />
+        Instalar o MinIO junto (recomendado) — fotos, vídeos e áudios das notas
+      </label>
+      <div id="blocoMinio">
+        <p class="nota">O MinIO fica <b>só na rede interna</b> (sem domínio público) e o app fala com
+          ele por <code id="txtMinioHost">http://agendamestre_minio:9000</code>. O bucket é criado
+          sozinho no primeiro boot, sempre privado.</p>
+        <div class="grade2">
+          <div class="campo">
+            <label for="gMinioUser">Usuário root (gerado)</label>
+            <div class="linha-cred">
+              <input id="gMinioUser" readonly autocomplete="off" />
+              <button type="button" class="btn-mini" data-copia="gMinioUser" title="Copiar">⧉</button>
+              <button type="button" class="btn-mini" data-regen="gMinioUser" title="Gerar outro">↻</button>
+            </div>
+          </div>
+          <div class="campo">
+            <label for="gMinioPass">Senha root (gerada)</label>
+            <div class="linha-cred">
+              <input id="gMinioPass" type="password" readonly autocomplete="off" />
+              <button type="button" class="btn-mini" data-olho="gMinioPass" title="Mostrar/ocultar">👁</button>
+              <button type="button" class="btn-mini" data-copia="gMinioPass" title="Copiar">⧉</button>
+              <button type="button" class="btn-mini" data-regen="gMinioPass" title="Gerar outra">↻</button>
+            </div>
+          </div>
+        </div>
+        <div class="grade2">
+          <div class="campo">
+            <label for="gMinioBucket">Bucket</label>
+            <input id="gMinioBucket" value="agendamestre-files" autocomplete="off" spellcheck="false" />
+            <small class="erro" data-erro="gMinioBucket"></small>
+          </div>
+          <div class="campo">
+            <label for="gMinioConsole">Domínio do console <em class="opc">opcional</em></label>
+            <input id="gMinioConsole" placeholder="minio.seudominio.com.br" autocomplete="off" spellcheck="false" />
+            <small class="ajuda">só se quiser acessar o painel do MinIO pelo navegador (exige DNS também)</small>
+            <small class="erro" data-erro="gMinioConsole"></small>
+          </div>
+        </div>
+      </div>
+      <p id="avisoSemMinio" class="aviso oculto">Sem MinIO, as mídias irão para um volume em disco
+        do próprio app (<code>FILES_DIR=/data/files</code>) — funciona, mas sem as vantagens do S3.</p>
+    </section>
+
+    <!-- ============ 5. INTEGRAÇÕES ============ -->
+    <section class="cartao">
+      <h2><span class="num">5</span> Integrações <em class="opc">todas opcionais</em></h2>
+      <p class="nota">Deixar em branco <b>desliga o recurso com aviso claro no app</b> — nunca coloque
+        valores de mentira: um placeholder faz o app achar que a integração existe e falhar feio.</p>
+
+      <details>
+        <summary>Groq — ditado por voz</summary>
+        <div class="campo">
+          <label for="gGroqKey">GROQ_API_KEY</label>
+          <input id="gGroqKey" autocomplete="off" spellcheck="false" placeholder="gsk_..." />
+        </div>
+        <div class="campo">
+          <label for="gGroqModel">Modelo STT <em class="opc">opcional</em></label>
+          <input id="gGroqModel" placeholder="whisper-large-v3-turbo (padrão)" autocomplete="off" spellcheck="false" />
+        </div>
+      </details>
+
+      <details>
+        <summary>Resend — e-mails (lembretes e recuperação de senha)</summary>
+        <div class="campo">
+          <label for="gResendKey">RESEND_API_KEY</label>
+          <input id="gResendKey" autocomplete="off" spellcheck="false" placeholder="re_..." />
+        </div>
+        <div class="grade2">
+          <div class="campo">
+            <label for="gResendNome">Nome do remetente</label>
+            <input id="gResendNome" value="AgendaMestre" autocomplete="off" />
+          </div>
+          <div class="campo">
+            <label for="gResendDominio">Domínio de e-mail verificado no Resend</label>
+            <input id="gResendDominio" placeholder="seudominio.com.br" autocomplete="off" spellcheck="false" />
+            <small class="erro" data-erro="gResendDominio"></small>
+          </div>
+        </div>
+        <p class="nota" id="txtResendPreview"></p>
+      </details>
+
+      <details>
+        <summary>Evolution GO v3 — WhatsApp</summary>
+        <div class="campo">
+          <label for="gEvoUrl">EVOLUTION_BASE_URL</label>
+          <input id="gEvoUrl" autocomplete="off" spellcheck="false" placeholder="https://seu-servidor-evolution..." inputmode="url" />
+          <small class="erro" data-erro="gEvoUrl"></small>
+        </div>
+        <div class="campo">
+          <label for="gEvoKey">EVOLUTION_API_KEY (chave global)</label>
+          <input id="gEvoKey" autocomplete="off" spellcheck="false" />
+        </div>
+      </details>
+
+      <details>
+        <summary>Google — "Continuar com Google"</summary>
+        <div class="grade2">
+          <div class="campo">
+            <label for="gGoogleId">GOOGLE_CLIENT_ID</label>
+            <input id="gGoogleId" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="campo">
+            <label for="gGoogleSecret">GOOGLE_CLIENT_SECRET</label>
+            <input id="gGoogleSecret" autocomplete="off" spellcheck="false" />
+          </div>
+        </div>
+        <p class="nota">No Google Cloud Console, a redirect URI precisa ser exatamente:
+          <code id="txtGoogleRedirect">https://SEU-DOMINIO/api/auth/google/callback</code></p>
+      </details>
+
+      <details>
+        <summary>Avançado — cotas, tetos e worker</summary>
+        <div class="grade3">
+          <div class="campo"><label for="gQuota">Cota por usuário (MB)</label>
+            <input id="gQuota" type="number" min="50" placeholder="500" /></div>
+          <div class="campo"><label for="gMaxFoto">Foto máx (MB)</label>
+            <input id="gMaxFoto" type="number" min="1" placeholder="15" /></div>
+          <div class="campo"><label for="gMaxVideo">Vídeo máx (MB)</label>
+            <input id="gMaxVideo" type="number" min="1" placeholder="95" /></div>
+          <div class="campo"><label for="gMaxAudio">Áudio máx (MB)</label>
+            <input id="gMaxAudio" type="number" min="1" placeholder="30" /></div>
+          <div class="campo"><label for="gMaxAnexo">Anexo máx (MB)</label>
+            <input id="gMaxAnexo" type="number" min="1" placeholder="25" /></div>
+          <div class="campo"><label for="gTick">Tick do worker (ms)</label>
+            <input id="gTick" type="number" min="5000" placeholder="45000" /></div>
+        </div>
+        <p class="nota">Vídeo acima de 95MB só funciona sem o proxy do Cloudflare na frente
+          (o plano free corta corpos em 100MB).</p>
+      </details>
+    </section>
+
+    <!-- ============ 6. SAÍDA ============ -->
+    <section class="cartao saida">
+      <h2><span class="num">6</span> Schema pronto</h2>
+      <div id="listaAvisos"></div>
+      <div class="acoes">
+        <button type="button" class="btn-primario" id="btnCopiar">Copiar schema</button>
+        <button type="button" class="btn" id="btnBaixar">Baixar agendamestre-schema.json</button>
+        <button type="button" class="btn" id="btnFicha">Baixar ficha de instalação (.txt)</button>
+      </div>
+      <pre id="outJson" aria-live="polite"></pre>
+
+      <h3>Como instalar (2 minutos)</h3>
+      <ol class="passos">
+        <li>No EasyPanel, crie um <b>projeto</b> com o mesmo nome informado acima.</li>
+        <li>Dentro do projeto: <b>Templates → developer → Create from Schema</b>.</li>
+        <li>Cole o JSON copiado e confirme — os 3 serviços (db, minio, app) são criados
+          e o app builda direto do GitHub.</li>
+        <li>Acompanhe o build; ao final, teste <code id="txtHealth">https://SEU-DOMINIO/api/health</code>
+          → <code>{"ok":true}</code>.</li>
+        <li>Guarde a <b>ficha de instalação</b> num lugar seguro — ela tem as senhas geradas.</li>
+      </ol>
+
+      <h3>O que continua manual (fora do EasyPanel)</h3>
+      <ul class="passos">
+        <li><b>DNS</b>: registro A/CNAME do domínio apontando para a VPS (antes da instalação,
+          em modo "DNS only" até o certificado ser emitido).</li>
+        <li><b>Resend</b>: verificar o domínio de e-mail (registros DKIM/SPF que o painel do Resend mostra).</li>
+        <li><b>Google</b>: criar as credenciais OAuth no Google Cloud Console com a redirect URI exibida acima.</li>
+        <li><b>Evolution</b>: servidor próprio já existente (o app só consome a API).</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    AgendaMestre — gerador de schema · roda 100% no seu navegador ·
+    <a href="https://github.com/alisson-haut/agenda-mestre" rel="noopener">repositório</a>
+  </footer>
+<script>
+/* Instalador AgendaMestre — gerador do schema "Create from Schema" do EasyPanel.
+   Script clássico de propósito (nada de module/fetch): funciona aberto direto
+   do disco (file://) e NUNCA faz request — as credenciais nascem e morrem aqui.
+   O schema é montado como OBJETO e serializado com JSON.stringify — jamais
+   colagem de strings (env é a única string multi-linha, montada por join). */
+
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ---------- aleatoriedade sem viés (rejection sampling) ---------- */
+  var ALFA_SENHA = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  var ALFA_USER = 'abcdefghijkmnopqrstuvwxyz23456789';
+
+  function randToken(len, alfabeto) {
+    var out = '';
+    var max = 256 - (256 % alfabeto.length); /* rejeita o resto que enviesa o módulo */
+    var buf = new Uint8Array(len * 2);
+    while (out.length < len) {
+      crypto.getRandomValues(buf);
+      for (var i = 0; i < buf.length && out.length < len; i++) {
+        if (buf[i] < max) out += alfabeto[buf[i] % alfabeto.length];
+      }
+    }
+    return out;
+  }
+
+  function genCredentials(campo) {
+    if (!campo || campo === 'gPgPass') $('gPgPass').value = randToken(32, ALFA_SENHA);
+    if (!campo || campo === 'gMinioUser') $('gMinioUser').value = 'am' + randToken(10, ALFA_USER);
+    if (!campo || campo === 'gMinioPass') $('gMinioPass').value = randToken(32, ALFA_SENHA);
+  }
+
+  /* ---------- validação (regexes oficiais do schema do EasyPanel) ---------- */
+  var RE_PROJETO = /^[a-z0-9-_]+$/;            /* projectName/serviceName/volume */
+  var RE_DB = /^[a-zA-Z][a-zA-Z0-9_]{0,62}$/;  /* databaseName/user */
+  var RE_HOST = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/i;
+  var RE_GH = /^[A-Za-z0-9](?:[A-Za-z0-9-_.]{0,99})$/;
+  var RE_BUCKET = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
+  var RE_URL_HTTPS = /^https?:\/\/[^\s]+$/i;
+
+  var validadores = {
+    gProjeto: { obrig: true, re: RE_PROJETO, msg: 'Use só minúsculas, números, hífen e underline.' },
+    gOwner: { obrig: true, re: RE_GH, msg: 'Usuário/organização do GitHub inválido.' },
+    gRepo: { obrig: true, re: RE_GH, msg: 'Nome de repositório inválido.' },
+    gBranch: { obrig: true, re: /^[\w./-]+$/, msg: 'Branch inválida.' },
+    gDominio: { obrig: true, re: RE_HOST, msg: 'Informe um domínio válido, sem https:// (ex.: agenda.seudominio.com.br).' },
+    gMinioBucket: { obrig: false, re: RE_BUCKET, msg: 'Bucket: minúsculas, números, ponto e hífen (3–63).' },
+    gMinioConsole: { obrig: false, re: RE_HOST, msg: 'Domínio do console inválido (sem https://).' },
+    gResendDominio: { obrig: false, re: RE_HOST, msg: 'Domínio de e-mail inválido (só o domínio, ex.: seudominio.com.br).' },
+    gEvoUrl: { obrig: false, re: RE_URL_HTTPS, msg: 'URL inválida (inclua http:// ou https://).' },
+  };
+
+  function validaCampo(id) {
+    var v = validadores[id];
+    var el = $(id);
+    var valor = el.value.trim();
+    var erroEl = document.querySelector('[data-erro="' + id + '"]');
+    var msg = '';
+    if (v.obrig && !valor) msg = 'Campo obrigatório.';
+    else if (valor && !v.re.test(valor)) msg = v.msg;
+    el.setAttribute('aria-invalid', msg ? 'true' : 'false');
+    if (erroEl) {
+      erroEl.textContent = msg;
+      erroEl.classList.toggle('on', !!msg);
+    }
+    return !msg;
+  }
+
+  function validaTudo() {
+    var ok = true;
+    for (var id in validadores) if (!validaCampo(id)) ok = false;
+    /* dependências: Resend com key exige domínio; Evolution com um exige o outro */
+    if ($('gResendKey').value.trim() && !$('gResendDominio').value.trim()) {
+      marca('gResendDominio', 'Com a chave do Resend, informe o domínio de e-mail verificado.');
+      ok = false;
+    }
+    if ($('gEvoKey').value.trim() && !$('gEvoUrl').value.trim()) {
+      marca('gEvoUrl', 'Com a chave do Evolution, informe a URL do servidor.');
+      ok = false;
+    }
+    return ok;
+  }
+
+  function marca(id, msg) {
+    $(id).setAttribute('aria-invalid', 'true');
+    var erroEl = document.querySelector('[data-erro="' + id + '"]');
+    if (erroEl) { erroEl.textContent = msg; erroEl.classList.add('on'); }
+  }
+
+  /* ---------- leitura do estado ---------- */
+  function lerEstado() {
+    var projeto = $('gProjeto').value.trim() || 'agendamestre';
+    /* databaseName não aceita "-": troca por "_" (com aviso na saída) */
+    var dbName = projeto.replace(/-/g, '_').replace(/^[^a-zA-Z]+/, '') || 'agendamestre';
+    return {
+      projeto: projeto,
+      dbName: dbName,
+      dbRenomeado: dbName !== projeto,
+      owner: $('gOwner').value.trim(),
+      repo: $('gRepo').value.trim(),
+      branch: $('gBranch').value.trim() || 'main',
+      dominio: $('gDominio').value.trim().toLowerCase(),
+      pgPass: $('gPgPass').value,
+      minio: $('chkMinio').checked,
+      minioUser: $('gMinioUser').value,
+      minioPass: $('gMinioPass').value,
+      minioBucket: $('gMinioBucket').value.trim() || 'agendamestre-files',
+      minioConsole: $('gMinioConsole').value.trim().toLowerCase(),
+      groqKey: $('gGroqKey').value.trim(),
+      groqModel: $('gGroqModel').value.trim(),
+      resendKey: $('gResendKey').value.trim(),
+      resendNome: $('gResendNome').value.trim() || 'AgendaMestre',
+      resendDominio: $('gResendDominio').value.trim().toLowerCase(),
+      evoUrl: $('gEvoUrl').value.trim().replace(/\/+$/, ''),
+      evoKey: $('gEvoKey').value.trim(),
+      googleId: $('gGoogleId').value.trim(),
+      googleSecret: $('gGoogleSecret').value.trim(),
+      quota: $('gQuota').value.trim(),
+      maxFoto: $('gMaxFoto').value.trim(),
+      maxVideo: $('gMaxVideo').value.trim(),
+      maxAudio: $('gMaxAudio').value.trim(),
+      maxAnexo: $('gMaxAnexo').value.trim(),
+      tick: $('gTick').value.trim(),
+    };
+  }
+
+  /* ---------- montagem do schema ---------- */
+  function buildSchema(s) {
+    var services = [];
+
+    services.push({
+      type: 'postgres',
+      data: {
+        projectName: s.projeto,
+        serviceName: 'db',
+        image: 'postgres:17',
+        password: s.pgPass,
+        user: 'postgres',
+        databaseName: s.dbName,
+      },
+    });
+
+    if (s.minio) {
+      var minioDomains = [];
+      var minioEnv = [
+        'MINIO_ROOT_USER=' + s.minioUser,
+        'MINIO_ROOT_PASSWORD=' + s.minioPass,
+      ];
+      if (s.minioConsole) {
+        minioDomains.push({ host: s.minioConsole, https: true, port: 9001, path: '/' });
+        minioEnv.push('MINIO_BROWSER_REDIRECT_URL=https://' + s.minioConsole);
+      }
+      services.push({
+        type: 'app',
+        data: {
+          projectName: s.projeto,
+          serviceName: 'minio',
+          source: { type: 'image', image: 'minio/minio:RELEASE.2025-04-22T22-12-26Z' },
+          deploy: { command: 'minio server /data --console-address ":9001"' },
+          env: minioEnv.join('\n'),
+          mounts: [{ type: 'volume', name: 'data', mountPath: '/data' }],
+          domains: minioDomains,
+        },
+      });
+    }
+
+    /* env do app: pares [chave, valor] — valor vazio = linha OMITIDA
+       (placeholder falso faria o app achar que a integração existe) */
+    var pares = [
+      ['NODE_ENV', 'production'],
+      ['PORT', '5192'],
+      ['DATABASE_URL', 'postgres://postgres:' + s.pgPass + '@' + s.projeto + '_db:5432/' + s.dbName],
+      ['APP_URL', s.dominio ? 'https://' + s.dominio : ''],
+    ];
+    if (s.minio) {
+      pares.push(
+        ['MINIO_SERVER_URL', 'http://' + s.projeto + '_minio:9000'],
+        ['MINIO_ROOT_USER', s.minioUser],
+        ['MINIO_ROOT_PASSWORD', s.minioPass],
+        ['MINIO_BUCKET', s.minioBucket],
+      );
+    } else {
+      pares.push(['FILES_DIR', '/data/files']);
+    }
+    pares.push(
+      ['GROQ_API_KEY', s.groqKey],
+      ['GROQ_STT_MODEL', s.groqModel],
+      ['EVOLUTION_BASE_URL', s.evoKey || s.evoUrl ? s.evoUrl : ''],
+      ['EVOLUTION_API_KEY', s.evoKey],
+    );
+    if (s.resendKey && s.resendDominio) {
+      pares.push(
+        ['RESEND_API_KEY', s.resendKey],
+        ['RESEND_FROM', s.resendNome + ' <lembretes@' + s.resendDominio + '>'],
+        ['RESEND_FROM_AUTH', s.resendNome + ' <no-reply@' + s.resendDominio + '>'],
+      );
+    }
+    pares.push(
+      ['GOOGLE_CLIENT_ID', s.googleId],
+      ['GOOGLE_CLIENT_SECRET', s.googleSecret],
+      ['FILES_USER_QUOTA_MB', s.quota],
+      ['FILES_MAX_FOTO_MB', s.maxFoto],
+      ['FILES_MAX_VIDEO_MB', s.maxVideo],
+      ['FILES_MAX_AUDIO_MB', s.maxAudio],
+      ['FILES_MAX_ANEXO_MB', s.maxAnexo],
+      ['NOTIFY_TICK_MS', s.tick],
+    );
+
+    var appData = {
+      projectName: s.projeto,
+      serviceName: 'app',
+      source: { type: 'github', owner: s.owner, repo: s.repo, ref: s.branch, path: '/', autoDeploy: true },
+      build: { type: 'dockerfile', file: 'Dockerfile' },
+      env: pares
+        .filter(function (p) { return p[1] !== ''; })
+        .map(function (p) { return p[0] + '=' + p[1]; })
+        .join('\n'),
+      domains: s.dominio ? [{ host: s.dominio, https: true, port: 5192, path: '/' }] : [],
+    };
+    if (!s.minio) appData.mounts = [{ type: 'volume', name: 'files', mountPath: '/data/files' }];
+    services.push({ type: 'app', data: appData });
+
+    return { services: services };
+  }
+
+  /* ---------- ficha de instalação ---------- */
+  function buildSheet(s) {
+    var l = [];
+    l.push('AGENDAMESTRE — FICHA DE INSTALACAO (guarde em local seguro!)');
+    l.push('Gerada em: ' + new Date().toLocaleString('pt-BR'));
+    l.push('');
+    l.push('== PROJETO ==');
+    l.push('Projeto EasyPanel : ' + s.projeto);
+    l.push('Repositorio       : github.com/' + s.owner + '/' + s.repo + ' (branch ' + s.branch + ')');
+    l.push('Dominio do app    : https://' + (s.dominio || '(nao informado)'));
+    l.push('');
+    l.push('== POSTGRES (servico "db") ==');
+    l.push('Host interno : ' + s.projeto + '_db:5432');
+    l.push('Usuario      : postgres');
+    l.push('Banco        : ' + s.dbName + (s.dbRenomeado ? '  (hifens viraram underline — confira na aba Credentials)' : ''));
+    l.push('Senha        : ' + s.pgPass);
+    l.push('');
+    if (s.minio) {
+      l.push('== MINIO (servico "minio") ==');
+      l.push('Endpoint interno : http://' + s.projeto + '_minio:9000');
+      l.push('Console          : ' + (s.minioConsole ? 'https://' + s.minioConsole : '(sem dominio publico — so rede interna)'));
+      l.push('Usuario root     : ' + s.minioUser);
+      l.push('Senha root       : ' + s.minioPass);
+      l.push('Bucket           : ' + s.minioBucket + ' (criado sozinho no primeiro boot)');
+      l.push('');
+    } else {
+      l.push('== ARQUIVOS ==');
+      l.push('Sem MinIO — midias em volume de disco do app (FILES_DIR=/data/files).');
+      l.push('');
+    }
+    l.push('== INTEGRACOES ==');
+    l.push('Groq (ditado)     : ' + (s.groqKey ? 'configurado' : 'desligado'));
+    l.push('Resend (e-mail)   : ' + (s.resendKey && s.resendDominio ? 'lembretes@' + s.resendDominio + ' / no-reply@' + s.resendDominio : 'desligado'));
+    l.push('Evolution (Whats) : ' + (s.evoUrl && s.evoKey ? s.evoUrl : 'desligado'));
+    l.push('Google (login)    : ' + (s.googleId && s.googleSecret ? 'configurado' : 'desligado'));
+    l.push('');
+    l.push('== CHECKLIST POS-INSTALACAO ==');
+    l.push('[ ] DNS do dominio apontando para a VPS (DNS only ate o certificado sair)');
+    l.push('[ ] https://' + (s.dominio || 'SEU-DOMINIO') + '/api/health respondendo {"ok":true}');
+    if (s.resendKey) l.push('[ ] Dominio de e-mail verificado no painel do Resend (DKIM/SPF)');
+    if (s.googleId) l.push('[ ] Redirect URI no Google Console: https://' + (s.dominio || 'SEU-DOMINIO') + '/api/auth/google/callback');
+    if (s.minioConsole) l.push('[ ] DNS do console do MinIO apontando para a VPS');
+    l.push('[ ] Criar sua conta no app (o cadastro e publico; nao ha admin pre-criado)');
+    l.push('');
+    l.push('Migracoes de banco, bucket de midia e workers: automaticos no primeiro boot.');
+    return l.join('\r\n');
+  }
+
+  /* ---------- avisos dinâmicos ---------- */
+  function renderAvisos(s) {
+    var avisos = [];
+    if (s.dbRenomeado)
+      avisos.push('O nome do projeto tem hífen: o banco será <code>' + s.dbName +
+        '</code> (hífen não é válido em nome de banco). Após instalar, confira na aba Credentials do Postgres.');
+    if (!s.minio)
+      avisos.push('MinIO desmarcado: as mídias das notas irão para um volume em disco do app.');
+    if (s.minioConsole)
+      avisos.push('Console do MinIO exposto em <code>https://' + s.minioConsole +
+        '</code> — o DNS desse domínio também precisa apontar para a VPS.');
+    if (s.googleId && s.dominio)
+      avisos.push('Google: cadastre a redirect URI <code>https://' + s.dominio +
+        '/api/auth/google/callback</code> no Google Cloud Console.');
+    var box = $('listaAvisos');
+    box.innerHTML = avisos.map(function (a) { return '<p class="aviso">' + a + '</p>'; }).join('');
+  }
+
+  /* ---------- saída ---------- */
+  function render() {
+    var ok = validaTudo();
+    var s = lerEstado();
+
+    $('txtMinioHost').textContent = 'http://' + s.projeto + '_minio:9000';
+    $('txtGoogleRedirect').textContent = 'https://' + (s.dominio || 'SEU-DOMINIO') + '/api/auth/google/callback';
+    $('txtHealth').textContent = 'https://' + (s.dominio || 'SEU-DOMINIO') + '/api/health';
+    $('txtResendPreview').textContent = s.resendDominio
+      ? 'Remetentes: ' + s.resendNome + ' <lembretes@' + s.resendDominio + '> · ' + s.resendNome + ' <no-reply@' + s.resendDominio + '>'
+      : '';
+    $('blocoMinio').classList.toggle('oculto', !s.minio);
+    $('avisoSemMinio').classList.toggle('oculto', s.minio);
+    renderAvisos(s);
+
+    var json = JSON.stringify(buildSchema(s), null, 2);
+    $('outJson').textContent = json;
+    $('btnCopiar').disabled = !ok;
+    $('btnBaixar').disabled = !ok;
+    $('btnFicha').disabled = !ok;
+    return json;
+  }
+
+  function download(nome, texto, mime) {
+    var blob = new Blob([texto], { type: mime || 'application/octet-stream' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = nome;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
+  }
+
+  function copiarTexto(texto, botao) {
+    var feito = function () {
+      var antes = botao.textContent;
+      botao.textContent = 'Copiado ✓';
+      setTimeout(function () { botao.textContent = antes; }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(texto).then(feito, function () { copiarLegado(texto); feito(); });
+    } else {
+      copiarLegado(texto);
+      feito();
+    }
+  }
+  function copiarLegado(texto) {
+    var ta = document.createElement('textarea');
+    ta.value = texto;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* melhor esforço */ }
+    ta.remove();
+  }
+
+  /* ---------- ligações ---------- */
+  document.addEventListener('DOMContentLoaded', function () {
+    genCredentials();
+
+    var timer = 0;
+    document.body.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(render, 120);
+    });
+    $('chkMinio').addEventListener('change', render);
+
+    document.body.addEventListener('click', function (e) {
+      var alvo = e.target.closest('button');
+      if (!alvo) return;
+      var id;
+      if ((id = alvo.getAttribute('data-regen'))) {
+        genCredentials(id);
+        render();
+      } else if ((id = alvo.getAttribute('data-olho'))) {
+        var inp = $(id);
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+      } else if ((id = alvo.getAttribute('data-copia'))) {
+        copiarTexto($(id).value, alvo);
+      }
+    });
+
+    $('btnCopiar').addEventListener('click', function () {
+      copiarTexto(render(), $('btnCopiar'));
+    });
+    $('btnBaixar').addEventListener('click', function () {
+      download('agendamestre-schema.json', render(), 'application/json');
+    });
+    $('btnFicha').addEventListener('click', function () {
+      render();
+      download('agendamestre-ficha-instalacao.txt', buildSheet(lerEstado()), 'text/plain');
+    });
+
+    render();
+  });
+})();
+
+</script>
+</body>
+</html>

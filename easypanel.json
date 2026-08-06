@@ -1,5 +1,5 @@
 {
-  "_comentario": "Schema de instalação para o EasyPanel (projeto: agendamestre). No EasyPanel: + Serviço → 'Create from Schema' e cole este JSON. Antes, troque: SEU-USUARIO-GITHUB, SEU-REPO, TROQUE-ESTA-SENHA, agenda.seudominio.com.br e as chaves de API. O host interno do banco segue o padrão <projeto>_<serviço>: agendamestre_db.",
+  "_comentario": "Schema de instalação do EasyPanel (projeto: agendamestre) — EXEMPLO do que o gerador em installer/index.html produz preenchido. Prefira o gerador: ele cria as senhas e monta tudo. Manual: troque SEU-USUARIO-GITHUB, SEU-REPO, TROQUE-ESTA-SENHA, TROQUE-USUARIO-MINIO, TROQUE-ESTA-SENHA-MINIO e agenda.seudominio.com.br; adicione as chaves de API ao env do app SÓ se tiver valores reais (placeholder quebra a integração; linha ausente = recurso desligado com aviso claro). No EasyPanel: projeto → Templates → developer → Create from Schema → colar. Host interno segue <projeto>_<serviço>.",
   "services": [
     {
       "type": "postgres",
@@ -7,7 +7,32 @@
         "projectName": "agendamestre",
         "serviceName": "db",
         "image": "postgres:17",
-        "password": "TROQUE-ESTA-SENHA"
+        "password": "TROQUE-ESTA-SENHA",
+        "user": "postgres",
+        "databaseName": "agendamestre"
+      }
+    },
+    {
+      "type": "app",
+      "data": {
+        "projectName": "agendamestre",
+        "serviceName": "minio",
+        "source": {
+          "type": "image",
+          "image": "minio/minio:RELEASE.2025-04-22T22-12-26Z"
+        },
+        "deploy": {
+          "command": "minio server /data --console-address \":9001\""
+        },
+        "env": "MINIO_ROOT_USER=TROQUE-USUARIO-MINIO\nMINIO_ROOT_PASSWORD=TROQUE-ESTA-SENHA-MINIO",
+        "mounts": [
+          {
+            "type": "volume",
+            "name": "data",
+            "mountPath": "/data"
+          }
+        ],
+        "domains": []
       }
     },
     {
@@ -27,16 +52,13 @@
           "type": "dockerfile",
           "file": "Dockerfile"
         },
-        "env": "NODE_ENV=production\nPORT=5192\nDATABASE_URL=postgres://postgres:TROQUE-ESTA-SENHA@agendamestre_db:5432/agendamestre\nGROQ_API_KEY=SUA-CHAVE-GROQ\nEVOLUTION_BASE_URL=https://seu-servidor-evolution.exemplo.com.br\nEVOLUTION_API_KEY=SUA-CHAVE-EVOLUTION\nRESEND_API_KEY=SUA-CHAVE-RESEND\nRESEND_FROM=AgendaMestre <lembretes@seudominio.com.br>\nRESEND_FROM_AUTH=AgendaMestre <no-reply@seudominio.com.br>\nMINIO_SERVER_URL=https://minio.seudominio.com.br\nMINIO_ROOT_USER=SEU-USUARIO-MINIO\nMINIO_ROOT_PASSWORD=SUA-SENHA-MINIO\nMINIO_BUCKET=agendamestre-files\nGOOGLE_CLIENT_ID=\nGOOGLE_CLIENT_SECRET=\nAPP_URL=https://agenda.seudominio.com.br",
-        "proxy": {
-          "port": 5192,
-          "secure": true
-        },
+        "env": "NODE_ENV=production\nPORT=5192\nDATABASE_URL=postgres://postgres:TROQUE-ESTA-SENHA@agendamestre_db:5432/agendamestre\nAPP_URL=https://agenda.seudominio.com.br\nMINIO_SERVER_URL=http://agendamestre_minio:9000\nMINIO_ROOT_USER=TROQUE-USUARIO-MINIO\nMINIO_ROOT_PASSWORD=TROQUE-ESTA-SENHA-MINIO\nMINIO_BUCKET=agendamestre-files",
         "domains": [
           {
             "host": "agenda.seudominio.com.br",
             "https": true,
-            "port": 5192
+            "port": 5192,
+            "path": "/"
           }
         ]
       }

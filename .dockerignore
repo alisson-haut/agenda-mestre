@@ -1,0 +1,17 @@
+# Contexto de build enxuto — só o necessário para npm ci + npm run build
+node_modules
+.git
+.data
+dist
+dist-server
+test-results
+playwright-report
+e2e
+installer
+docs
+*.md
+.env
+.env.*
+.claude
+.vscode
+.idea

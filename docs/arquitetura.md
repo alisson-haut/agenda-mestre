@@ -43,6 +43,8 @@ server/
     templates.ts · tz.ts · auth-emails.ts (reset de senha)
 shared/                 dates.ts + recurrence.ts (client E server importam)
 e2e/                    agenda · alerts · auth-reset · notes · contacts · secrets
+installer/              gerador do schema EasyPanel — página única estática,
+                        FORA do build (Vite/esbuild/Docker não a enxergam)
 ```
 
 ## Fluxo de dados

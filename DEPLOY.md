@@ -11,36 +11,39 @@ git remote add origin https://github.com/SEU-USUARIO-GITHUB/SEU-REPO.git
 git push -u origin main
 ```
 
-## 2. Instalação no EasyPanel (pelo arquivo)
+## 2. Instalação em 1 passo (gerador de schema) — RECOMENDADO
 
-1. No EasyPanel, crie o projeto **agendamestre**.
-2. Clique em **+ Service → Create from Schema** (colar JSON).
-3. Abra o arquivo [`easypanel.json`](easypanel.json) deste repositório, troque os
-   placeholders (`SEU-USUARIO-GITHUB`, `SEU-REPO`, `TROQUE-ESTA-SENHA`,
-   `agenda.seudominio.com.br`) e cole o conteúdo.
-4. Confirme. O EasyPanel cria dois serviços:
-   - **db** — Postgres 17 com volume persistente;
-   - **app** — build pelo `Dockerfile` do repositório, exposto na porta 5192.
+Abra **[`installer/index.html`](installer/index.html)** no navegador (duplo
+clique no arquivo baixado — é uma página única, 100% offline: nada sai dela).
+Preencha o domínio e o que quiser de integrações; a página **gera as senhas**
+do Postgres e do MinIO e monta o JSON completo.
 
-> Se a sua versão do EasyPanel não aceitar o schema, crie manualmente:
-> 1. **+ Service → Postgres** (nome `db`, defina a senha).
-> 2. **+ Service → App** → Source: GitHub (repo e branch `main`) → Build: **Dockerfile**.
-> 3. Em **Environment** do app, cole:
->    ```
->    NODE_ENV=production
->    PORT=5192
->    DATABASE_URL=postgres://postgres:SUA-SENHA@agendamestre_db:5432/agendamestre
->    ```
->    (host interno = `<projeto>_<serviço>`; confira usuário/nome do banco na aba
->    Credentials do serviço Postgres e ajuste a URL se forem diferentes.)
-> 4. Em **Domains & Proxy**, aponte o domínio para a porta **5192**.
-5. Clique em **Deploy**. Verifique a saúde em `https://seu-dominio/api/health`.
+1. No EasyPanel, crie o projeto (mesmo nome informado no gerador).
+2. Dentro do projeto: **Templates → developer → Create from Schema**.
+3. Cole o JSON gerado e confirme. Três serviços nascem de uma vez:
+   - **db** — Postgres 17 (usuário/banco já declarados: a conexão nasce certa);
+   - **minio** — storage S3 das mídias, **só na rede interna** (sem domínio);
+   - **app** — build pelo `Dockerfile` direto do GitHub, exposto na porta 5192.
+4. Acompanhe o build e teste `https://seu-dominio/api/health` → `{"ok":true}`.
+5. Guarde a **ficha de instalação** (.txt baixado do gerador) — tem as senhas.
 
-> **Migrações são automáticas**: no primeiro boot o servidor cria todas as
-> tabelas no Postgres (schema idempotente) — não há passo manual de migração.
+> **Tudo o mais é automático no primeiro boot**: migrações do banco (schema
+> idempotente), criação do bucket privado no MinIO (com re-tentativas até o
+> MinIO subir), worker de notificações e varredura de manutenção. O app também
+> espera o Postgres ficar de pé (retry ~2min) — a ordem de subida não importa.
+
+### Alternativa manual (sem o gerador)
+
+O arquivo [`easypanel.json`](easypanel.json) é o mesmo schema com placeholders:
+troque `SEU-USUARIO-GITHUB`, `SEU-REPO`, `TROQUE-ESTA-SENHA`,
+`TROQUE-USUARIO-MINIO`, `TROQUE-ESTA-SENHA-MINIO` e `agenda.seudominio.com.br`
+e cole no mesmo Create from Schema. Ou crie os serviços um a um pela UI
+(Postgres → App por imagem `minio/minio` com volume em `/data` → App do GitHub
+com as envs da tabela abaixo).
+
 > As integrações (Groq, Resend, Evolution, Google) são opcionais: deixe as
-> chaves vazias (ou remova as linhas) para desligá-las — com placeholders
-> tipo `SUA-CHAVE-...` preenchidos, o app acha que estão configuradas e os
+> linhas FORA do env para desligá-las com aviso claro — um placeholder tipo
+> `SUA-CHAVE-...` preenchido faz o app achar que estão configuradas e os
 > envios falham com erro de autenticação.
 
 ## 3. DNS no Cloudflare (ou outro provedor)
@@ -81,6 +84,10 @@ domínio verificado, o Resend entrega apenas para o e-mail da própria conta
 As fotos/vídeos/áudios das notas ficam num **MinIO** (S3) ao lado do app.
 O navegador nunca fala com o MinIO — todo upload/download passa pela API
 autenticada (`/api/files`), então as credenciais ficam só no servidor.
+
+> **Usou o gerador (seção 2)?** O serviço MinIO já veio no schema, interno-only,
+> com credenciais geradas — nada a fazer aqui. Os passos abaixo são o fallback
+> para criação manual pela UI.
 
 **No EasyPanel** (criação pela UI):
 1. **+ Service → App** → Source: **Docker Image** `minio/minio` (fixe uma
