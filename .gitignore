@@ -1,0 +1,27 @@
+# Dependências e builds
+node_modules/
+dist/
+dist-server/
+
+# Banco local de desenvolvimento (PGlite)
+.data/
+
+# Segredos e configuração local — NUNCA commitar
+# (.env.example é a única exceção: só placeholders)
+.env
+.env.*
+!.env.example
+*.local
+
+# Saídas de teste
+playwright-report/
+test-results/
+
+# Config local de ferramentas
+.claude/
+.vscode/
+.idea/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db

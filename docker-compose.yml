@@ -1,0 +1,42 @@
+# Sobe o AgendaMestre + Postgres com um comando:
+#   POSTGRES_PASSWORD=uma-senha-forte docker compose up -d --build
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "5192:5192"
+    environment:
+      NODE_ENV: production
+      PORT: "5192"
+      DATABASE_URL: postgres://agendamestre:${POSTGRES_PASSWORD:-troque-esta-senha}@db:5432/agendamestre
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      EVOLUTION_BASE_URL: ${EVOLUTION_BASE_URL:-}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-}
+      RESEND_FROM_AUTH: ${RESEND_FROM_AUTH:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      APP_URL: ${APP_URL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agendamestre
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-troque-esta-senha}
+      POSTGRES_DB: agendamestre
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agendamestre -d agendamestre"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  dbdata:

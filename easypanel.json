@@ -1,0 +1,45 @@
+{
+  "_comentario": "Schema de instalação para o EasyPanel (projeto: agendamestre). No EasyPanel: + Serviço → 'Create from Schema' e cole este JSON. Antes, troque: SEU-USUARIO-GITHUB, SEU-REPO, TROQUE-ESTA-SENHA, agenda.seudominio.com.br e as chaves de API. O host interno do banco segue o padrão <projeto>_<serviço>: agendamestre_db.",
+  "services": [
+    {
+      "type": "postgres",
+      "data": {
+        "projectName": "agendamestre",
+        "serviceName": "db",
+        "image": "postgres:17",
+        "password": "TROQUE-ESTA-SENHA"
+      }
+    },
+    {
+      "type": "app",
+      "data": {
+        "projectName": "agendamestre",
+        "serviceName": "app",
+        "source": {
+          "type": "github",
+          "owner": "SEU-USUARIO-GITHUB",
+          "repo": "SEU-REPO",
+          "ref": "main",
+          "path": "/",
+          "autoDeploy": true
+        },
+        "build": {
+          "type": "dockerfile",
+          "file": "Dockerfile"
+        },
+        "env": "NODE_ENV=production\nPORT=5192\nDATABASE_URL=postgres://postgres:TROQUE-ESTA-SENHA@agendamestre_db:5432/agendamestre\nGROQ_API_KEY=SUA-CHAVE-GROQ\nEVOLUTION_BASE_URL=https://seu-servidor-evolution.exemplo.com.br\nEVOLUTION_API_KEY=SUA-CHAVE-EVOLUTION\nRESEND_API_KEY=SUA-CHAVE-RESEND\nRESEND_FROM=AgendaMestre <lembretes@seudominio.com.br>\nRESEND_FROM_AUTH=AgendaMestre <no-reply@seudominio.com.br>\nGOOGLE_CLIENT_ID=\nGOOGLE_CLIENT_SECRET=\nAPP_URL=https://agenda.seudominio.com.br",
+        "proxy": {
+          "port": 5192,
+          "secure": true
+        },
+        "domains": [
+          {
+            "host": "agenda.seudominio.com.br",
+            "https": true,
+            "port": 5192
+          }
+        ]
+      }
+    }
+  ]
+}
