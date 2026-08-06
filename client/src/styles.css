@@ -1048,9 +1048,11 @@ body.dragging .viewport{touch-action:none}
 }
 .link-row{display:flex;align-items:center;gap:8px}
 .link-row .inp{flex:1;min-width:0}
-.link-row .lr-x{flex:none;width:36px;height:36px;border-radius:var(--r-s);display:grid;place-items:center;color:var(--ink-3)}
-.link-row .lr-x:hover{color:var(--danger);background:var(--surface-3)}
-.link-row .lr-x svg{width:15px;height:15px}
+/* ✕ pequeno genérico — usado nas linhas de link E nos campos do cofre
+   (classe GLOBAL de propósito: sem estilo, o svg vira 300×150 e explode a linha) */
+.lr-x{flex:none;width:36px;height:36px;border-radius:var(--r-s);display:grid;place-items:center;color:var(--ink-3)}
+.lr-x:hover{color:var(--danger);background:var(--surface-3)}
+.lr-x svg{width:15px;height:15px}
 /* seletor de contatos da nota */
 .cpick{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .cpick-chip{
