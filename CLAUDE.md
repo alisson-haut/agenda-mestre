@@ -46,6 +46,12 @@ npm run build        # dist/ (front) + dist-server/ (API bundle)
 7. Envio de e-mail/WhatsApp **sempre** pelo outbox (`enqueue()`) — exceção
    única: e-mails TRANSACIONAIS de conta (reset de senha, testes de canal)
    vão direto pelo `sendEmail` com `limited()` próprio.
+8. **O instalador é parte do contrato de deploy** (`installer/index.html` +
+   `easypanel.json` + `docker-compose.yml` + `.env.example` + DEPLOY.md):
+   env/serviço/porta/volume novo ou mudança de boot SÓ está completa quando
+   refletida em todos, no mesmo commit — e o boot continua 100% automático
+   (checklists em docs/instalador.md). Feature com passo manual de
+   instalação = feature incompleta.
 
 ## Mapa de documentos — leia só o que a tarefa pede
 
@@ -57,4 +63,5 @@ npm run build        # dist/ (front) + dist-server/ (API bundle)
 | Motor de e-mail/WhatsApp, fila, rate limits, enqueue p/ novas features | `docs/mensageria.md` |
 | Groq (ditado), Evolution GO (pegadinhas!), Resend, MinIO (pegadinhas!), DNS | `docs/integracoes.md` |
 | Testes: rodar, padrões, mocks, flakiness | `docs/testes.md` |
+| Instalador/gerador de schema, checklists de env/serviço novo | `docs/instalador.md` |
 | Deploy EasyPanel/Cloudflare, envs de produção | `DEPLOY.md` |

@@ -118,3 +118,7 @@ installer/              gerador do schema EasyPanel — página única estática
 - **Cofre zero-knowledge com senha-mestra SEPARADA da conta** (decisão do
   dono): esquecer = perder os itens (avisado no setup); reset de senha da
   conta não toca o cofre; contas Google (senha aleatória) funcionam.
+- **Instalador como contrato de deploy** (instalação de produção validada por
+  ele): toda env/serviço novo entra no gerador + easypanel.json + compose +
+  docs no MESMO commit, e o boot permanece automático e tolerante a ordem —
+  regra 8 do CLAUDE.md, checklists em docs/instalador.md.

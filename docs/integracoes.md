@@ -37,6 +37,21 @@ gerado por nós e guardado em `notify_settings` (nunca vai ao browser).
   "no qr code available" (= aguardando). Ver `isLoggedInError`/`isNoQrError`.
 - Wrapper `evoFetch`: timeout 10s, retry 2x só em 5xx (200/600ms), envelope
   `{ok,...}` sem exceptions.
+- **`DELETE /instance/delete/{id}` exige o UUID** da instância (o `id` que o
+  `/instance/all` devolve), NÃO o nome — com o nome o Evolution responde
+  `500 invalid UUID format`. O código já usa `found.id` (correto).
+
+**QR não aparece em PRODUÇÃO ("Gerando QR code..." eterno) — roteiro:**
+1. `GET /instance/all` com a chave global: a instância `agendamestre-…`
+   existe? Se SIM, a rede app→Evolution está ok — o problema é estado de
+   sessão (orçamento de 5 QRs esgotado, sessão zumbi).
+2. Recuperação padrão: apagar as instâncias `agendamestre-*` desconectadas
+   (`connected:false`) pelo UUID — o app recria do zero no próximo
+   "Conectar por QR code" com orçamento cheio. É o mesmo último degrau da
+   escada do `/whatsapp/connect`.
+3. Se nem a instância existe: conferir `EVOLUTION_BASE_URL`/`EVOLUTION_API_KEY`
+   no env do serviço app e os logs do container durante o clique (evoFetch
+   loga o erro real).
 
 ## Resend — e-mail (`server/notify/resend.ts`)
 
