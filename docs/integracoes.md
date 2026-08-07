@@ -97,3 +97,11 @@ O navegador NUNCA fala com o MinIO — proxy autenticado em `/api/files`.
 - `getPartialObject(bucket, key, offset, length)` p/ Range/206 (vídeo).
 - Erros de "não existe": código `NoSuchKey`/`NotFound` (tratados como ok no
   delete idempotente).
+- **O MinIO rejeita `Host` com underscore** (`Invalid Request (invalid
+  hostname)`) — e o hostname interno do EasyPanel é `<projeto>_<serviço>`
+  (ex.: `agendamestre_app_minio`). O DNS do Docker resolve, mas a requisição
+  HTTP é recusada. Por isso o adapter, ao ver `_` no hostname, manda um Host
+  sintético válido (`minio.interno`) e resolve o nome REAL no `lookup` do
+  `transportAgent` (harness validou o header e a conexão). Não "simplificar"
+  removendo isso: quebra TODA instalação EasyPanel silenciosamente — e o
+  sintoma só aparece no primeiro upload, não no boot.

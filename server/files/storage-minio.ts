@@ -4,19 +4,40 @@
    Bucket privado, criado no boot; lifecycle aborta multipart órfão em 1 dia. */
 
 import * as Minio from 'minio';
+import dns from 'node:dns';
+import { Agent as HttpAgent } from 'node:http';
+import { Agent as HttpsAgent } from 'node:https';
 import type { Readable } from 'node:stream';
 import { assertKey, type Storage, type StorageStat } from './storage.js';
 
 export function createMinioStorage(): Storage & { init(): Promise<void> } {
   const url = new URL(process.env.MINIO_SERVER_URL!);
   const useSSL = url.protocol === 'https:';
+  /* Pegadinha EasyPanel: o hostname interno é <projeto>_<serviço> e o MinIO
+     REJEITA Host com underscore ("Invalid Request (invalid hostname)" — não é
+     nome DNS válido). O DNS do Docker resolve o nome normalmente, então o
+     truque é mandar um Host sintético válido e resolver o nome REAL no lookup
+     do agent — cada socket novo refaz o lookup, sobrevivendo a restart do
+     MinIO com IP novo. */
+  let endPoint = url.hostname;
+  let transportAgent: HttpAgent | undefined;
+  if (endPoint.includes('_')) {
+    const real = endPoint;
+    endPoint = 'minio.interno';
+    const lookup = ((host: string, opts: unknown, cb: unknown) =>
+      (dns.lookup as any)(host === endPoint ? real : host, opts, cb)) as unknown;
+    transportAgent = useSSL
+      ? new HttpsAgent({ lookup } as ConstructorParameters<typeof HttpsAgent>[0])
+      : new HttpAgent({ lookup } as ConstructorParameters<typeof HttpAgent>[0]);
+  }
   const client = new Minio.Client({
-    endPoint: url.hostname,
+    endPoint,
     port: url.port ? Number(url.port) : useSSL ? 443 : 80,
     useSSL,
     accessKey: process.env.MINIO_ROOT_USER || '',
     secretKey: process.env.MINIO_ROOT_PASSWORD || '',
     pathStyle: true,
+    ...(transportAgent ? { transportAgent } : {}),
   });
   const bucket = process.env.MINIO_BUCKET || 'agendamestre-files';
 
