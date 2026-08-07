@@ -109,9 +109,10 @@ authRouter.post('/register', async (req, res, next) => {
         return res.status(409).json({ error: 'Este e-mail já tem conta. Entre com sua senha.' });
       throw e;
     }
-    await createSession(id, res);
+    /* SEM auto-login: o usuário volta à tela de entrada e faz login
+       de propósito (decisão de UX — confirma que memorizou a senha) */
     audit('auth.register_ok', { userId: id, ip: req.ip });
-    res.json({ id, email, name, avatar: null });
+    res.json({ ok: true });
   } catch (e) {
     next(e);
   }
@@ -178,6 +179,28 @@ authRouter.post('/password', requireAuth, async (req: AuthedRequest, res, next) 
       req.user!.id,
       token ? sha256(token) : '',
     ]);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/* verificação da senha atual SEM trocá-la — usada por ações destrutivas
+   (ex.: "Apagar tudo"). Mesma chave de rate limit do /password: 10 erros
+   bloqueiam ambos por 10min (semântica única de força bruta). */
+authRouter.post('/verify', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    const password = String(req.body?.password ?? '');
+    const key = 'pass:' + (req.ip || 'x') + ':' + req.user!.id;
+    if (limited(key)) return res.status(429).json({ error: 'Muitas tentativas. Aguarde alguns minutos.' });
+    const db = await getDB();
+    const { rows } = await db.query('SELECT password_hash FROM users WHERE id = $1', [req.user!.id]);
+    if (!rows.length || !(await bcrypt.compare(password, rows[0].password_hash))) {
+      audit('auth.verify_fail', { userId: req.user!.id, ip: req.ip });
+      return res.status(401).json({ error: 'Senha incorreta' });
+    }
+    attempts.delete(key);
+    audit('auth.verify_ok', { userId: req.user!.id, ip: req.ip });
     res.json({ ok: true });
   } catch (e) {
     next(e);

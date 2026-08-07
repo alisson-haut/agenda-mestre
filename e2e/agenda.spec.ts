@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const senha = 'senha-forte-123';
 const novoEmail = () => `teste-${Date.now()}-${Math.floor(Math.random() * 1e6)}@exemplo.com`;
@@ -8,7 +8,12 @@ async function criarConta(page: Page, email: string) {
   await page.getByRole('tab', { name: 'Criar conta' }).click();
   await page.locator('#aEmail').fill(email);
   await page.locator('#aPass').fill(senha);
-  await page.getByRole('button', { name: 'Criar conta e entrar' }).click();
+  await page.locator('#aPass2').fill(senha);
+  await page.getByRole('button', { name: 'Criar conta', exact: true }).click();
+  /* sem auto-login: volta ao login com banner e e-mail preservado */
+  await expect(page.locator('.auth-ok')).toBeVisible();
+  await page.locator('#aPass').fill(senha);
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page.locator('.views')).toBeVisible();
 }
 
@@ -123,4 +128,82 @@ test('senha errada é recusada', async ({ page }) => {
   await page.locator('#aPass').fill('senha-errada-999');
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page.locator('.auth-err')).toContainText('incorretos');
+});
+
+test('registro exige senhas iguais e volta ao login sem entrar', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Criar conta' }).click();
+  await page.locator('#aEmail').fill(novoEmail());
+  await page.locator('#aPass').fill(senha);
+  await page.locator('#aPass2').fill('outra-senha-123');
+  await page.getByRole('button', { name: 'Criar conta', exact: true }).click();
+  await expect(page.locator('.auth-err')).toContainText('não conferem');
+
+  /* corrige → conta criada, volta ao LOGIN (sem entrar) com banner */
+  await page.locator('#aPass2').fill(senha);
+  await page.getByRole('button', { name: 'Criar conta', exact: true }).click();
+  await expect(page.locator('.auth-ok')).toContainText('Conta criada');
+  await expect(page.getByRole('button', { name: 'Entrar', exact: true })).toBeVisible();
+  await expect(page.locator('.views')).not.toBeVisible();
+});
+
+/* no mobile a folha (#side) abre recolhida (peek) e itens dela — pills, rodapé
+   com "Apagar tudo" — ficam fora do viewport; expandir por gesto é flaky em
+   teste, então quando há grip (mobile) o clique é disparado via DOM. O que os
+   testes validam é o fluxo APÓS o clique; o clique real é coberto no desktop. */
+async function clicarNaFolha(page: Page, alvo: Locator) {
+  if (await page.locator('#grip').isVisible().catch(() => false)) {
+    /* pills abrem no motor de drag&drop (pointerdown→pointerup sem movimento),
+       botões comuns no click — dispara os três; os que não se aplicam são inertes */
+    await alvo.evaluate((el) => {
+      const o: PointerEventInit = { bubbles: true, cancelable: true, button: 0, isPrimary: true, pointerId: 1 };
+      el.dispatchEvent(new PointerEvent('pointerdown', o));
+      el.dispatchEvent(new PointerEvent('pointerup', o));
+      (el as HTMLElement).click();
+    });
+  } else {
+    await alvo.click();
+  }
+}
+
+test('Apagar tudo exige a senha da conta', async ({ page }) => {
+  await criarConta(page, novoEmail());
+  await abrirNovaTarefa(page);
+  await page.locator('#tTitle').fill('Tarefa que vai sumir');
+  await page.getByRole('button', { name: 'Salvar tarefa' }).click();
+
+  await clicarNaFolha(page, page.getByRole('button', { name: 'Apagar tudo' }));
+  await expect(page.locator('#confirmDlg #cfPass')).toBeVisible();
+
+  /* senha errada → erro inline, modal continua aberto */
+  await page.locator('#cfPass').fill('senha-errada-999');
+  await page.locator('#cfOk').click();
+  await expect(page.locator('#confirmDlg .auth-err')).toContainText('incorreta');
+
+  /* senha certa → apaga */
+  await page.locator('#cfPass').fill(senha);
+  await page.locator('#cfOk').click();
+  await expect(page.locator('.toast')).toContainText('Tudo apagado');
+  await expect(page.locator('.pill-title', { hasText: 'Tarefa que vai sumir' })).toHaveCount(0);
+});
+
+test('excluir tarefa pede confirmação', async ({ page }) => {
+  await criarConta(page, novoEmail());
+  await abrirNovaTarefa(page);
+  await page.locator('#tTitle').fill('Tarefa protegida');
+  await page.getByRole('button', { name: 'Salvar tarefa' }).click();
+  await page.waitForTimeout(800);
+
+  await clicarNaFolha(page, page.locator('#side .pill-title', { hasText: 'Tarefa protegida' }).first());
+  await page.locator('.overlay.open [aria-label="Excluir tarefa"]').click();
+  await expect(page.locator('#confirmDlg')).toHaveClass(/open/);
+
+  /* cancelar mantém a tarefa */
+  await page.locator('#confirmDlg').getByRole('button', { name: 'Cancelar' }).click();
+  await expect(page.locator('#side .pill-title', { hasText: 'Tarefa protegida' }).first()).toBeVisible();
+
+  /* confirmar exclui */
+  await page.locator('.overlay.open [aria-label="Excluir tarefa"]').click();
+  await page.locator('#confirmDlg').getByRole('button', { name: 'Excluir' }).click();
+  await expect(page.locator('.toast')).toContainText('foi excluída');
 });

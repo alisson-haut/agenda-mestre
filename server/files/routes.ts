@@ -190,8 +190,15 @@ filesRouter.get('/:id', async (req: AuthedRequest, res, next) => {
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Content-Type', f.mime);
     res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
-    const dispo = f.kind === 'anexo' ? 'attachment' : 'inline';
+    /* PDF pode ser visto no app (viewer/aba); os demais anexos só baixam */
+    const dispo = f.kind === 'anexo' && f.mime !== 'application/pdf' ? 'attachment' : 'inline';
     res.setHeader('Content-Disposition', `${dispo}; filename="${encodeURIComponent(f.name)}"`);
+    if (f.mime === 'application/pdf') {
+      /* SÓ o PDF pode ser emoldurado, e só pela própria origem — sobrescreve
+         os headers globais (DENY/frame-ancestors none) APENAS nesta resposta */
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+      res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+    }
 
     const rangeHdr = String(req.headers.range || '');
     const m = rangeHdr.match(/^bytes=(\d*)-(\d*)$/);

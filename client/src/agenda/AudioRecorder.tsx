@@ -64,6 +64,9 @@ export function AudioRecorder({ maxSecs = 600, onDone, onError, onClose, onPickF
         return;
       }
       streamRef.current = stream;
+      /* REARMAR é obrigatório: com StrictMode, o cleanup do 1º mount deixa
+         true e o blob seria descartado em silêncio no onstop (bug real) */
+      cancelledRef.current = false;
       chunksRef.current = [];
       const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'

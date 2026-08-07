@@ -8,7 +8,12 @@ async function criarConta(page: Page, email: string) {
   await page.getByRole('tab', { name: 'Criar conta' }).click();
   await page.locator('#aEmail').fill(email);
   await page.locator('#aPass').fill(senha);
-  await page.getByRole('button', { name: 'Criar conta e entrar' }).click();
+  await page.locator('#aPass2').fill(senha);
+  await page.getByRole('button', { name: 'Criar conta', exact: true }).click();
+  /* sem auto-login: volta ao login com banner e e-mail preservado */
+  await expect(page.locator('.auth-ok')).toBeVisible();
+  await page.locator('#aPass').fill(senha);
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page.locator('.views')).toBeVisible();
 }
 

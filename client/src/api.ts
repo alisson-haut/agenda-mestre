@@ -80,8 +80,13 @@ export const api = {
       throw e;
     });
   },
-  register(email: string, password: string, name: string): Promise<User> {
+  /** cria a conta SEM entrar — o usuário volta ao login */
+  register(email: string, password: string, name: string): Promise<void> {
     return req('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, password, name }) });
+  },
+  /** confirma a senha da conta (ações destrutivas) — 401 se incorreta */
+  verifyPassword(password: string): Promise<void> {
+    return req('/api/auth/verify', { method: 'POST', body: JSON.stringify({ password }) });
   },
   login(email: string, password: string): Promise<User> {
     return req('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });

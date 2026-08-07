@@ -19,6 +19,10 @@ export default function App() {
 
   const enter = useCallback(async (u: User) => {
     const st = await api.getState();
+    /* aplica o tema salvo ANTES do commit da fase — sem flash dark→light
+       para usuário de tema claro (a animação de entrada cobre o resto) */
+    const t = st.prefs?.theme;
+    if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
     setUser(u);
     setInitial(st);
     setPhase('app');

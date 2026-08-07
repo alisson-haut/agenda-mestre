@@ -8,7 +8,12 @@ async function criarConta(page: Page, email: string) {
   await page.getByRole('tab', { name: 'Criar conta' }).click();
   await page.locator('#aEmail').fill(email);
   await page.locator('#aPass').fill(senha);
-  await page.getByRole('button', { name: 'Criar conta e entrar' }).click();
+  await page.locator('#aPass2').fill(senha);
+  await page.getByRole('button', { name: 'Criar conta', exact: true }).click();
+  /* sem auto-login: volta ao login com banner e e-mail preservado */
+  await expect(page.locator('.auth-ok')).toBeVisible();
+  await page.locator('#aPass').fill(senha);
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page.locator('.views')).toBeVisible();
 }
 
@@ -37,10 +42,10 @@ test('cria, edita e exclui um contato', async ({ page }) => {
   await page.locator('#contactsDlg').getByRole('button', { name: 'Salvar contato' }).click();
   await expect(page.locator('.contact-name', { hasText: 'Acme Brasil' })).toBeVisible();
 
-  /* excluir (confirmação via toast com ação) */
+  /* excluir (confirmação via ConfirmModal) */
   await page.locator('.contact-row', { hasText: 'Maria Silva' }).click();
   await page.locator('#contactsDlg [aria-label="Excluir contato"]').click();
-  await page.locator('.toast').getByRole('button', { name: 'Excluir' }).click();
+  await page.locator('#confirmDlg').getByRole('button', { name: 'Excluir' }).click();
   await expect(page.locator('.toast')).toContainText('Contato excluído');
 });
 

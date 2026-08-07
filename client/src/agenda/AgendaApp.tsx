@@ -10,6 +10,7 @@ import { TaskModal, type TaskPayload } from './TaskModal';
 import { NoteModal } from './NoteModal';
 import { ContactsModal } from './ContactsModal';
 import { SecretsModal } from './SecretsModal';
+import { ConfirmModal, type ConfirmCfg } from './ConfirmModal';
 import { CatModal } from './CatModal';
 import { ConfigModal } from './ConfigModal';
 import { AlertModal } from './AlertModal';
@@ -193,12 +194,28 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
   const viewportRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  /* animação de entrada: cascata topbar → viewport → lateral no 1º paint */
+  const [entering, setEntering] = useState(true);
+  useEffect(() => {
+    const id = window.setTimeout(() => setEntering(false), 700);
+    return () => window.clearTimeout(id);
+  }, []);
+
   /* ---------- notas e contatos (CRUD próprio, fora do full-state) ---------- */
   const [notes, setNotes] = useState<Note[]>([]);
   const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [noteModal, setNoteModal] = useState({ open: false, session: 0, editing: null as Note | null });
   const [contactsModal, setContactsModal] = useState({ open: false, session: 0 });
   const [secretsModal, setSecretsModal] = useState({ open: false, session: 0 });
+  /* confirmação central de ações destrutivas (um único modal p/ todos) */
+  const [confirmModal, setConfirmModal] = useState<{ open: boolean; session: number; cfg: ConfirmCfg | null }>({
+    open: false, session: 0, cfg: null,
+  });
+  const askConfirm = useCallback(
+    (cfg: ConfirmCfg) => setConfirmModal((s) => ({ open: true, session: s.session + 1, cfg })),
+    [],
+  );
+  const closeConfirm = () => setConfirmModal((s) => ({ ...s, open: false }));
   /* nota que está esperando a tarefa gerada (fluxo "Gerar tarefa") */
   const pendingNoteTask = useRef<string | null>(null);
   useEffect(() => {
@@ -492,17 +509,25 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
   const deleteTask = () => {
     const t = taskModal.editing;
     if (!t) return;
-    const i = data.tasks.indexOf(t);
-    mutate((d) => {
-      d.tasks.splice(i, 1);
-      for (const k of Object.keys(d.prefs.alerts)) if (k.startsWith(t.id + '|')) delete d.prefs.alerts[k];
+    askConfirm({
+      title: 'Excluir tarefa',
+      msg: `Excluir a tarefa "${t.title}"?`,
+      confirmLabel: 'Excluir',
+      danger: true,
+      onConfirm: () => {
+        const i = data.tasks.indexOf(t);
+        mutate((d) => {
+          d.tasks.splice(i, 1);
+          for (const k of Object.keys(d.prefs.alerts)) if (k.startsWith(t.id + '|')) delete d.prefs.alerts[k];
+        });
+        closeTask();
+        toast.show(`"${t.title}" foi excluída`, () =>
+          mutate((d) => {
+            d.tasks.splice(i, 0, t);
+          }),
+        );
+      },
     });
-    closeTask();
-    toast.show(`"${t.title}" foi excluída`, () =>
-      mutate((d) => {
-        d.tasks.splice(i, 0, t);
-      }),
-    );
   };
 
   /* ---------- notas ---------- */
@@ -545,28 +570,34 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
     }
   };
 
-  const deleteNote = async () => {
+  const deleteNote = () => {
     const n = noteModal.editing;
     if (!n) return;
-    closeNote();
-    try {
-      await api.deleteNote(n.id);
-      setNotes((arr) => arr.filter((x) => x.id !== n.id));
-      if (n.files.length) {
-        /* mídia foi apagada do storage — não há undo honesto */
-        toast.show(`Nota e ${n.files.length} arquivo(s) excluídos`);
-      } else {
-        const payload: NotePayload = {
-          id: n.id, title: n.title, desc: n.desc, date: n.date,
-          links: n.links, contactIds: n.contactIds, taskId: n.taskId,
-        };
-        toast.show('Nota excluída', () => {
-          api.createNote(payload).then((volta) => setNotes((arr) => [volta, ...arr])).catch(() => {});
-        });
-      }
-    } catch (e: any) {
-      toast.show(e?.message || 'Não consegui excluir a nota');
-    }
+    askConfirm({
+      title: 'Excluir nota',
+      msg: n.files.length
+        ? `Excluir a nota e ${n.files.length} arquivo(s)? Os arquivos são apagados definitivamente.`
+        : 'Excluir esta nota?',
+      confirmLabel: 'Excluir',
+      danger: true,
+      onConfirm: async () => {
+        await api.deleteNote(n.id); /* falha → erro inline, nota permanece */
+        closeNote();
+        setNotes((arr) => arr.filter((x) => x.id !== n.id));
+        if (n.files.length) {
+          /* mídia foi apagada do storage — não há undo honesto */
+          toast.show(`Nota e ${n.files.length} arquivo(s) excluídos`);
+        } else {
+          const payload: NotePayload = {
+            id: n.id, title: n.title, desc: n.desc, date: n.date,
+            links: n.links, contactIds: n.contactIds, taskId: n.taskId,
+          };
+          toast.show('Nota excluída', () => {
+            api.createNote(payload).then((volta) => setNotes((arr) => [volta, ...arr])).catch(() => {});
+          });
+        }
+      },
+    });
   };
 
   const saveCat = (name: string, color: string, icon: string | null) => {
@@ -612,7 +643,7 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
     mutate,
     suspended: () =>
       taskModal.open || catModal.open || cfgModal.open || noteModal.open || contactsModal.open ||
-      secretsModal.open || dragActiveRef.current,
+      secretsModal.open || confirmModal.open || dragActiveRef.current,
   });
   /* o primeiro toque em qualquer lugar libera o AudioContext para os alertas */
   useEffect(() => {
@@ -936,7 +967,8 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
     }
     if (e.key === 'Escape') {
       /* topo-primeiro: fecha só o modal mais alto da pilha e para
-         (a câmera intercepta o próprio Escape antes de chegar aqui) */
+         (câmera e viewer interceptam o próprio Escape antes de chegar aqui) */
+      if (confirmModal.open) { closeConfirm(); return; }
       if (secretsModal.open) { setSecretsModal((s) => ({ ...s, open: false })); return; }
       if (contactsModal.open) { setContactsModal((s) => ({ ...s, open: false })); return; }
       if (noteModal.open) { setNoteModal((s) => ({ ...s, open: false })); return; }
@@ -949,7 +981,8 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
       return;
     }
     const modalAberto =
-      taskModal.open || catModal.open || cfgModal.open || noteModal.open || contactsModal.open || secretsModal.open;
+      taskModal.open || catModal.open || cfgModal.open || noteModal.open || contactsModal.open ||
+      secretsModal.open || confirmModal.open;
     if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
       if (modalAberto) return;
       e.preventDefault();
@@ -977,9 +1010,15 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
   }, []);
 
   const resetAll = () => {
-    toast.show(
-      'Apagar todas as tarefas e voltar às etiquetas originais?',
-      () => {
+    askConfirm({
+      title: 'Apagar tudo',
+      msg: 'Isso apaga TODAS as suas tarefas e devolve as etiquetas originais. Notas, contatos e arquivos não são afetados. Digite a senha da conta para confirmar.',
+      confirmLabel: 'Apagar tudo',
+      danger: true,
+      askPassword: true,
+      hint: 'Entrou com o Google e nunca criou senha? Defina uma pelo "Esqueci minha senha" na tela de entrada.',
+      onConfirm: async (senha) => {
+        await api.verifyPassword(senha || ''); /* 401/429 → erro inline no modal */
         mutate((d) => {
           d.tasks = [];
           d.cats = PRESETS.map((c) => ({ ...c }));
@@ -989,8 +1028,7 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
         setSelDay(null);
         toast.show('Tudo apagado');
       },
-      'Apagar',
-    );
+    });
   };
 
   /* ---------- dados derivados para a lateral ---------- */
@@ -1130,7 +1168,7 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
 
   return (
     <>
-      <div className="app">
+      <div className={`app ${entering ? 'app-enter' : ''}`}>
         <header className="topbar">
           <div className="top-row">
             <div className="brand">
@@ -1445,6 +1483,7 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
         onDelete={deleteNote}
         onClose={closeNote}
         onManageContacts={() => setContactsModal((s) => ({ open: true, session: s.session + 1 }))}
+        onAskConfirm={askConfirm}
         onInvalid={(m) => toast.show(m)}
       />
       <ContactsModal
@@ -1455,7 +1494,9 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
         onChange={setContacts}
         onClose={() => setContactsModal((s) => ({ ...s, open: false }))}
         onMsg={(m) => toast.show(m)}
-        onConfirm={(msg, fn) => toast.show(msg, fn, 'Excluir')}
+        onConfirm={(msg, fn) =>
+          askConfirm({ title: 'Excluir contato', msg, confirmLabel: 'Excluir', danger: true, onConfirm: fn })
+        }
         onInvalid={(m) => toast.show(m)}
       />
       <SecretsModal
@@ -1488,7 +1529,15 @@ export function AgendaApp({ user, initial, onLogout }: { user: User; initial: Se
         onProfile={(u) => setProfile(u)}
         onClose={() => setCfgModal((s) => ({ ...s, open: false }))}
         onMsg={(m) => toast.show(m)}
-        onConfirm={(m, fn, label) => toast.show(m, fn, label)}
+        onConfirm={(m, fn, label) =>
+          askConfirm({ title: 'Confirmar', msg: m, confirmLabel: label || 'Confirmar', danger: true, onConfirm: fn })
+        }
+      />
+      <ConfirmModal
+        open={confirmModal.open}
+        session={confirmModal.session}
+        cfg={confirmModal.cfg}
+        onClose={closeConfirm}
       />
 
       <div className={`toast ${toast.state.visible ? 'show' : ''}`}>

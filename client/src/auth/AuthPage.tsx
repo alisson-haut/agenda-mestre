@@ -9,9 +9,12 @@ export function AuthPage({ onAuth }: { onAuth: (u: User) => Promise<void> | void
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [password2, setPassword2] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [forgotOk, setForgotOk] = useState<string | null>(null);
+  /* conta recém-criada: banner no login (o registro NÃO entra sozinho) */
+  const [registerOk, setRegisterOk] = useState(false);
   const [google, setGoogle] = useState(false);
   const [googleErr] = useState(() => new URLSearchParams(location.search).get('google') === 'erro');
 
@@ -23,6 +26,8 @@ export function AuthPage({ onAuth }: { onAuth: (u: User) => Promise<void> | void
     setMode(m);
     setErr(null);
     setForgotOk(null);
+    setRegisterOk(false);
+    setPassword2('');
   }
 
   async function submit(e: FormEvent) {
@@ -34,11 +39,20 @@ export function AuthPage({ onAuth }: { onAuth: (u: User) => Promise<void> | void
       if (mode === 'forgot') {
         const r = await api.forgot(email);
         setForgotOk(r.message);
+      } else if (mode === 'register') {
+        if (password !== password2) {
+          setErr('As senhas não conferem.');
+          setBusy(false);
+          return;
+        }
+        await api.register(email, password, name);
+        /* volta ao login com o e-mail preservado — entrar é um ato consciente */
+        setMode('login');
+        setPassword('');
+        setPassword2('');
+        setRegisterOk(true);
       } else {
-        const u =
-          mode === 'login'
-            ? await api.login(email, password)
-            : await api.register(email, password, name);
+        const u = await api.login(email, password);
         await onAuth(u);
         return;
       }
@@ -77,6 +91,12 @@ export function AuthPage({ onAuth }: { onAuth: (u: User) => Promise<void> | void
             </button>
           </div>
         )}
+        {mode === 'login' && registerOk && (
+          <div className="auth-ok" role="status">
+            <b>Conta criada</b>
+            Entre com seu e-mail e senha para começar.
+          </div>
+        )}
         {mode === 'forgot' && forgotOk ? (
           <div className="auth-ok" role="status">
             <b>Confira sua caixa de entrada</b>
@@ -111,6 +131,14 @@ export function AuthPage({ onAuth }: { onAuth: (u: User) => Promise<void> | void
                 )}
               </div>
             )}
+            {mode === 'register' && (
+              <div className="field">
+                <label className="label" htmlFor="aPass2">Confirmar senha</label>
+                <input className="inp" id="aPass2" type="password" required minLength={8} value={password2}
+                  onChange={(e) => setPassword2(e.target.value)}
+                  placeholder="Repita a senha" autoComplete="new-password" />
+              </div>
+            )}
             {(err || googleErr) && (
               <div className="auth-err" role="alert">
                 {err || 'Não foi possível entrar com o Google. Tente de novo.'}
@@ -122,7 +150,7 @@ export function AuthPage({ onAuth }: { onAuth: (u: User) => Promise<void> | void
                 : mode === 'login'
                   ? 'Entrar'
                   : mode === 'register'
-                    ? 'Criar conta e entrar'
+                    ? 'Criar conta'
                     : 'Enviar link'}
             </button>
             {mode !== 'forgot' && (

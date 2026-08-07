@@ -40,6 +40,7 @@ app.use((_req, res, next) => {
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: blob:",
         "media-src 'self' data: blob:" /* previews locais + mídia via /api/files */,
+        "frame-src 'self'" /* visualizador de PDF (iframe p/ /api/files) */,
         "connect-src 'self'",
         "frame-ancestors 'none'",
         "base-uri 'self'",

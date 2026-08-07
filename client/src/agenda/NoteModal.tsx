@@ -11,6 +11,9 @@ import { uid } from './dates';
 import { Dictation } from './Dictation';
 import { AudioRecorder } from './AudioRecorder';
 import { CameraCapture } from './CameraCapture';
+import { AudioPlayer } from './AudioPlayer';
+import { MediaViewer } from './MediaViewer';
+import type { ConfirmCfg } from './ConfirmModal';
 
 export interface MediaEntry {
   key: string;
@@ -34,6 +37,7 @@ interface Props {
   onDelete(): void;
   onClose(): void;
   onManageContacts(): void;
+  onAskConfirm(cfg: ConfirmCfg): void;
   onInvalid(msg: string): void;
 }
 
@@ -74,6 +78,8 @@ export function NoteModal(p: Props) {
   /* captura in-app: câmera fullscreen (desktop) e gravador de áudio inline */
   const [cam, setCam] = useState<null | 'photo' | 'video'>(null);
   const [recAudio, setRecAudio] = useState(false);
+  /* lightbox de mídia (foto/vídeo/pdf) */
+  const [viewer, setViewer] = useState<null | { kind: 'foto' | 'video' | 'pdf'; url: string; name: string }>(null);
   const noteIdRef = useRef('');
   const dayRef = useRef('');
   const taskIdRef = useRef<string | null>(null);
@@ -116,6 +122,7 @@ export function NoteModal(p: Props) {
     setPickQ('');
     setCam(null);
     setRecAudio(false);
+    setViewer(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.session]);
 
@@ -156,7 +163,9 @@ export function NoteModal(p: Props) {
         continue;
       }
       const key = uid();
-      const localUrl = kind === 'foto' || kind === 'video' ? URL.createObjectURL(blob) : null;
+      /* áudio também ganha preview local — o player toca o recém-gravado
+         antes mesmo do upload terminar */
+      const localUrl = kind !== 'anexo' ? URL.createObjectURL(blob) : null;
       setMedia((arr) => [...arr, { key, kind, name, file: null, blob, localUrl, status: 'sending', pct: 0 }]);
       upload(key, blob, kind, name);
     }
@@ -171,10 +180,26 @@ export function NoteModal(p: Props) {
     inputsRef.current[kind]?.click();
   };
 
-  const removeMedia = (m: MediaEntry) => {
+  const removeLocal = (m: MediaEntry) => {
     if (m.localUrl) URL.revokeObjectURL(m.localUrl);
     setMedia((arr) => arr.filter((x) => x.key !== m.key));
-    if (m.file) api.deleteNoteFile(m.file.id).catch(() => {});
+  };
+
+  const removeMedia = (m: MediaEntry) => {
+    /* upload pendente/falho não é destrutivo — remove sem cerimônia */
+    if (m.status !== 'ok' || !m.file) return removeLocal(m);
+    p.onAskConfirm({
+      title: 'Excluir arquivo',
+      msg: `Excluir "${m.name}" definitivamente?`,
+      confirmLabel: 'Excluir',
+      danger: true,
+      onConfirm: async () => {
+        /* falha (rede/401) → erro inline no confirm e o item PERMANECE —
+           nada de arquivo fantasma que volta no próximo reload */
+        await api.deleteNoteFile(m.file!.id);
+        removeLocal(m);
+      },
+    });
   };
 
   const retryMedia = (m: MediaEntry) => {
@@ -255,9 +280,9 @@ export function NoteModal(p: Props) {
       aria-labelledby="nHead"
       onClick={(e) => {
         const el = e.target as HTMLElement;
-        /* durante captura, o backdrop não fecha (gesto acidental perderia a
-           gravação) — só o ✕ explícito */
-        if (el === e.currentTarget && (cam || recAudio)) return;
+        /* durante captura/visualização, o backdrop não fecha (gesto acidental
+           perderia a gravação) — só o ✕ explícito */
+        if (el === e.currentTarget && (cam || recAudio || viewer)) return;
         if (el === e.currentTarget || el.closest('[data-close]')) p.onClose();
       }}
     >
@@ -321,7 +346,10 @@ export function NoteModal(p: Props) {
             {recAudio && (
               <div className="dict-rec-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <AudioRecorder
-                  onDone={(blob) => addBlobs('audio', [{ blob, name: 'gravacao.webm' }])}
+                  onDone={(blob, mime) => {
+                    const ext = mime === 'audio/mp4' ? 'm4a' : mime === 'audio/ogg' ? 'ogg' : 'webm';
+                    addBlobs('audio', [{ blob, name: `gravacao.${ext}` }]);
+                  }}
                   onError={p.onInvalid}
                   onClose={() => setRecAudio(false)}
                   onPickFile={() => inputsRef.current.audio?.click()}
@@ -346,35 +374,53 @@ export function NoteModal(p: Props) {
               onChange={(e) => { addBlobs('anexo', [...(e.target.files || [])].map((f) => ({ blob: f, name: f.name }))); e.target.value = ''; }} />
             {media.length > 0 && (
               <div className="media-grid">
-                {media.map((m) => (
-                  <div key={m.key} className={`media-item ${m.status === 'err' ? 'err' : ''}`}>
-                    {m.kind === 'foto' && (m.localUrl || m.file) && (
-                      <img src={m.localUrl || m.file!.url} alt={m.name} loading="lazy" />
-                    )}
-                    {m.kind === 'video' && (m.localUrl || m.file) && (
-                      <video src={m.localUrl || m.file!.url} muted playsInline preload="metadata" />
-                    )}
-                    {(m.kind === 'audio' || m.kind === 'anexo') && (
-                      <span className="m-ic">
-                        <svg><use href={m.kind === 'audio' ? '#i-mic' : '#i-clip'} /></svg>
-                        <span>{m.name}</span>
-                      </span>
-                    )}
-                    {m.status === 'err' ? (
-                      <button className="m-retry" onClick={() => retryMedia(m)}>
-                        <svg style={{ width: 16, height: 16 }}><use href="#i-refresh" /></svg>
-                        Tentar de novo
-                      </button>
-                    ) : (
-                      <button className="m-x" aria-label={`Remover ${m.name}`} onClick={() => removeMedia(m)}>
-                        <svg><use href="#i-close" /></svg>
-                      </button>
-                    )}
-                    {m.status === 'sending' && (
-                      <span className="m-bar"><i style={{ width: `${m.pct}%` }} /></span>
-                    )}
-                  </div>
-                ))}
+                {media.map((m) => {
+                  const url = m.localUrl || m.file?.url || '';
+                  const ehPdf = m.kind === 'anexo' && (m.file?.mime === 'application/pdf' || /\.pdf$/i.test(m.name));
+                  const abrivel = m.kind === 'foto' || m.kind === 'video' || ehPdf;
+                  const abrir = () => {
+                    if (!url) return;
+                    if (m.kind === 'foto') setViewer({ kind: 'foto', url, name: m.name });
+                    else if (m.kind === 'video') setViewer({ kind: 'video', url, name: m.name });
+                    else if (ehPdf && m.file) setViewer({ kind: 'pdf', url: m.file.url, name: m.name });
+                    else if (m.file) window.open(m.file.url, '_blank', 'noopener'); /* anexo comum: baixar */
+                  };
+                  return (
+                    <div
+                      key={m.key}
+                      className={`media-item ${m.kind === 'audio' ? 'audio' : ''} ${m.status === 'err' ? 'err' : ''} ${abrivel ? 'media-open' : ''}`}
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('.m-x, .m-retry, .ap')) return;
+                        abrir();
+                      }}
+                    >
+                      {m.kind === 'foto' && url && <img src={url} alt={m.name} loading="lazy" />}
+                      {m.kind === 'video' && url && (
+                        <video src={url} muted playsInline preload="metadata" />
+                      )}
+                      {m.kind === 'audio' && url && <AudioPlayer src={url} />}
+                      {m.kind === 'anexo' && (
+                        <span className="m-ic">
+                          <svg><use href="#i-clip" /></svg>
+                          <span>{m.name}</span>
+                        </span>
+                      )}
+                      {m.status === 'err' ? (
+                        <button className="m-retry" onClick={() => retryMedia(m)}>
+                          <svg style={{ width: 16, height: 16 }}><use href="#i-refresh" /></svg>
+                          Tentar de novo
+                        </button>
+                      ) : (
+                        <button className="m-x" aria-label={`Remover ${m.name}`} onClick={() => removeMedia(m)}>
+                          <svg><use href="#i-close" /></svg>
+                        </button>
+                      )}
+                      {m.status === 'sending' && (
+                        <span className="m-bar"><i style={{ width: `${m.pct}%` }} /></span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -466,6 +512,7 @@ export function NoteModal(p: Props) {
           onPickFile={() => inputsRef.current[cam === 'photo' ? 'foto' : 'video']?.click()}
         />
       )}
+      {viewer && <MediaViewer {...viewer} onClose={() => setViewer(null)} />}
     </div>
   );
 }
