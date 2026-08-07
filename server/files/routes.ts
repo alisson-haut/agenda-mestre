@@ -118,10 +118,20 @@ filesRouter.post('/notes/:noteId', async (req: AuthedRequest, res, next) => {
     });
 
     const storage = await getStorage();
+    /* quem morreu primeiro decide a resposta: se o STORAGE falhou (MinIO fora,
+       credencial errada...), o pipeline derruba o req e "req.destroyed" viraria
+       um falso "cliente abortou" — por isso o aborto real é rastreado por evento
+       e a falha de storage é logada e respondida como 502, não mascarada em 400 */
+    let clientAbort = false;
+    const marcaAborto = () => {
+      clientAbort = true;
+    };
+    req.once('aborted', marcaAborto);
+    req.once('error', marcaAborto);
+    let putErr: any = null;
     try {
       /* pipeline conecta req→counter; o put consome o counter (streaming real).
          O catch síncrono no putP evita unhandled rejection se o pipeline cair. */
-      let putErr: any = null;
       const putP = storage.put(objKey, counter, size, mime).catch((e) => {
         putErr = e;
       });
@@ -137,9 +147,19 @@ filesRouter.post('/notes/:noteId', async (req: AuthedRequest, res, next) => {
       if (seen !== size) throw new Error('bytes-mismatch');
     } catch (e: any) {
       await storage.delete(objKey).catch(() => {});
-      if (req.destroyed || e?.message === 'excedeu' || e?.message === 'bytes-mismatch')
+      if (clientAbort || e?.message === 'excedeu' || e?.message === 'bytes-mismatch')
         return res.status(400).json({ error: 'Envio interrompido ou tamanho inconsistente.' });
+      if (putErr) {
+        console.error('files: storage.put falhou:', putErr?.message || putErr);
+        return res
+          .status(502)
+          .json({ error: 'Armazenamento de arquivos fora do ar no servidor (MinIO). Avise o administrador.' });
+      }
+      if (req.destroyed) return res.status(400).json({ error: 'Envio interrompido ou tamanho inconsistente.' });
       throw e;
+    } finally {
+      req.off('aborted', marcaAborto);
+      req.off('error', marcaAborto);
     }
 
     /* statement único, sem tx — DB é a fonte de verdade sobre o objeto */
